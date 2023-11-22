@@ -116,12 +116,15 @@ class Crossword:
             self.words.append(word)
 
     def fitness(self) -> int:
+        # Award points for each word placed
         score = len(self.words) * 10
 
+        # Penalize words not fully inside grid
         for word in self.words:
             if not self.validate_word_location(word):
                 score -= 5
 
+        # Award points for each overlapping letter match
         letter_positions = set()
         for word in self.words:
             for letter in word.letters:
@@ -129,6 +132,7 @@ class Crossword:
                     score += 3
                 letter_positions.add((letter.x, letter.y))
 
+        # Check vertical separation
         for i in range(len(self.words)):
             for j in range(i + 1, len(self.words)):
                 w1 = self.words[i]
@@ -137,6 +141,7 @@ class Crossword:
                     if abs(w1.x - w2.x) < 2:
                         score -= 15
 
+        # Check horizontal separation
         for i in range(len(self.words)):
             for j in range(i + 1, len(self.words)):
                 w1 = self.words[i]
