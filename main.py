@@ -48,6 +48,14 @@ class Word:
 
         return Word(letters, direction)
 
+    def move(self, new_x: int, new_y: int, new_direction: Direction) -> None:
+        for index, letter in enumerate(self.letters):
+            shift_x = index if new_direction == Direction.HORIZONTAL else 0
+            shift_y = index if new_direction == Direction.VERTICAL else 0
+
+            letter.x = new_x + shift_x
+            letter.y = new_y + shift_y
+
 
 class Crossword:
     n: int
@@ -72,8 +80,10 @@ class Crossword:
             for letter in word.letters:
                 grid[letter.x][letter.y] = letter.value
 
+        print("- " * (self.n + 1))
         for row in grid:
-            print(' '.join(row))
+            print(f"|{' '.join(row)}|")
+        print("- " * (self.n + 1))
 
     def validate_word_location(self, word: Word) -> bool:
         first_letter = word.letters[0]
