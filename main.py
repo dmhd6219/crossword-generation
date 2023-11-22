@@ -115,6 +115,38 @@ class Crossword:
             word = Word.create_from_string(string, x, y, direction)
             self.words.append(word)
 
+    def fitness(self) -> int:
+        score = len(self.words) * 10
+
+        for word in self.words:
+            if not self.validate_word_location(word):
+                score -= 5
+
+        letter_positions = set()
+        for word in self.words:
+            for letter in word.letters:
+                if (letter.x, letter.y) in letter_positions:
+                    score += 3
+                letter_positions.add((letter.x, letter.y))
+
+        for i in range(len(self.words)):
+            for j in range(i + 1, len(self.words)):
+                w1 = self.words[i]
+                w2 = self.words[j]
+                if w1.direction == w2.direction == Direction.VERTICAL:
+                    if abs(w1.x - w2.x) < 2:
+                        score -= 15
+
+        for i in range(len(self.words)):
+            for j in range(i + 1, len(self.words)):
+                w1 = self.words[i]
+                w2 = self.words[j]
+                if w1.direction == w2.direction == Direction.HORIZONTAL:
+                    if abs(w1.y - w2.y) < 2:
+                        score -= 15
+
+        return score
+
 
 def main() -> None:
     array_of_strings = ["qwerty", "ask", "sviatoslav"]
