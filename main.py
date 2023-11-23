@@ -181,13 +181,18 @@ class EvolutionaryAlgorithm:
 
     strings: List[str]
 
-    def __init__(self, strings):
+    n: int
+    m: int
+
+    def __init__(self, strings: List[str], n: int = 20, m: int = 20):
         self.strings = strings
+        self.n = n
+        self.m = m
 
         self.populations = []
 
-        initial = Crossword(strings)
-        initial.words = initial.generate_randon_locations()
+        initial = Crossword(n=n, m=m)
+        initial.words = initial.generate_randon_locations(strings)
 
         self.populations.append(initial)
 
@@ -240,10 +245,10 @@ class EvolutionaryAlgorithm:
 def main() -> None:
     array_of_strings = ["zoo", "goal", "ape"]
 
-    crossword = Crossword(array_of_strings, n=5, m=5)
-    crossword.visualize()
+    evolution = EvolutionaryAlgorithm(array_of_strings, n=5, m=5)
+    evolution.populations[0].visualize()
 
-    print(f"Value of fitness function : {crossword.fitness(crossword.words)}")
+    print(f"Value of fitness function : {evolution.fitness(evolution.populations[0])}")
 
 
 if __name__ == "__main__":
