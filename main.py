@@ -1,3 +1,9 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+@author: Sviatoslav Sviatkin
+"""
+
 from __future__ import annotations
 
 import enum
@@ -130,14 +136,13 @@ class Crossword:
         return True
 
     def generate_randon_locations(self) -> None:
-        # TODO: fix errors with placing out of field
         self.words = []
 
         for string in self.strings:
             direction = random.choice(list(Direction))
 
-            constraint_x = self.n
-            constraint_y = self.m
+            constraint_x = self.n - 1
+            constraint_y = self.m - 1
 
             if direction == Direction.HORIZONTAL:
                 constraint_x = constraint_x - len(string)
