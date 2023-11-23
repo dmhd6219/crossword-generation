@@ -10,6 +10,15 @@ class Direction(enum.Enum):
     VERTICAL = 1
 
 
+class Awards(enum.Enum):
+    INTERSECT_WITH_EQUAL_LETTER = 10
+    INTERSECT_WITH_DIFFERENT_LETTERS = -10
+    DONT_INTERSECT = 0
+
+    NEAR = -8
+    FAR = 0
+
+
 class Letter:
     x: int
     y: int
@@ -18,6 +27,9 @@ class Letter:
     def __init__(self, x: int, y: int, value: str):
         self.x, self.y = x, y
         self.value = value
+
+    def __eq__(self, other: Letter) -> bool:
+        return self.x == other.x and self.y == other.y and self.value == other.value
 
 
 class Word:
@@ -36,6 +48,27 @@ class Word:
         self.length = len(letters)
 
         self.direction = direction
+
+    def __repr__(self) -> str:
+        return "".join([x.value for x in self.letters])
+
+    def __eq__(self, other: Word) -> bool:
+        return self.length == other.length and all([self.letters[i] == other.letters[i] for i in range(self.length)])
+
+    def intersect(self, other: Word) -> int:
+        for self_letter in self.letters:
+            for other_letter in other.letters:
+                if self_letter == other_letter:
+                    return Awards.INTERSECT_WITH_EQUAL_LETTER.value
+                else:
+                    if (self.x == other.x) and (self.y == other.y):
+                        return Awards.INTERSECT_WITH_DIFFERENT_LETTERS.value
+
+        return Awards.DONT_INTERSECT.value
+
+    def near(self, other: Word) -> int:
+        # TODO implement detecting near words
+        return Awards.FAR.value
 
     @staticmethod
     def create_from_string(string: str, x: int, y: int, direction: Direction) -> Word:
@@ -91,11 +124,13 @@ class Crossword:
 
         for coord in (first_letter.x, first_letter.y, last_letter.x, last_letter.y):
             if (not (0 <= coord < self.n)) or (not (0 <= coord < self.m)):
+                print("wrong!! " + str(word))
                 return False
 
         return True
 
     def generate_randon_locations(self) -> None:
+        # TODO: fix errors with placing out of field
         self.words = []
 
         for string in self.strings:
@@ -125,39 +160,23 @@ class Crossword:
                 score -= 5
 
         # Award points for each overlapping letter match
-        letter_positions = set()
-        for word in self.words:
-            for letter in word.letters:
-                if (letter.x, letter.y) in letter_positions:
-                    score += 3
-                letter_positions.add((letter.x, letter.y))
+        for word1 in self.words:
+            for word2 in self.words:
+                if word1 == word2:
+                    continue
 
-        # Check vertical separation
-        for i in range(len(self.words)):
-            for j in range(i + 1, len(self.words)):
-                w1 = self.words[i]
-                w2 = self.words[j]
-                if w1.direction == w2.direction == Direction.VERTICAL:
-                    if abs(w1.x - w2.x) < 2:
-                        score -= 15
-
-        # Check horizontal separation
-        for i in range(len(self.words)):
-            for j in range(i + 1, len(self.words)):
-                w1 = self.words[i]
-                w2 = self.words[j]
-                if w1.direction == w2.direction == Direction.HORIZONTAL:
-                    if abs(w1.y - w2.y) < 2:
-                        score -= 15
+                score += word1.intersect(word2)
 
         return score
 
 
 def main() -> None:
-    array_of_strings = ["qwerty", "ask", "sviatoslav"]
+    array_of_strings = ["zoo", "goal", "ape"]
 
-    crossword = Crossword(array_of_strings)
+    crossword = Crossword(array_of_strings, n=5, m=5)
     crossword.visualize()
+
+    print(crossword.fitness())
 
 
 if __name__ == "__main__":
