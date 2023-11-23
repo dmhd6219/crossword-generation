@@ -7,8 +7,12 @@
 from __future__ import annotations
 
 import enum
+import itertools
 import random
+import sys
 from typing import List
+
+MAX_INT = sys.maxsize
 
 
 class Direction(enum.Enum):
@@ -17,9 +21,8 @@ class Direction(enum.Enum):
 
 
 class Awards(enum.Enum):
-    INTERSECT_WITH_EQUAL_LETTER = 10
+    INTERSECT_WITH_EQUAL_LETTER = 30
     INTERSECT_WITH_DIFFERENT_LETTERS = -10
-    DONT_INTERSECT = 0
 
     NEAR = -8
     FAR = 0
@@ -61,20 +64,34 @@ class Word:
     def __eq__(self, other: Word) -> bool:
         return self.length == other.length and all([self.letters[i] == other.letters[i] for i in range(self.length)])
 
-    def intersect(self, other: Word) -> int:
+    def __intersect(self, other: Word) -> Awards:
         for self_letter in self.letters:
             for other_letter in other.letters:
                 if self_letter == other_letter:
-                    return Awards.INTERSECT_WITH_EQUAL_LETTER.value
+                    return Awards.INTERSECT_WITH_EQUAL_LETTER
                 else:
-                    if (self.x == other.x) and (self.y == other.y):
-                        return Awards.INTERSECT_WITH_DIFFERENT_LETTERS.value
+                    if (self_letter.x == other_letter.x) and (self_letter.y == other_letter.y):
+                        return Awards.INTERSECT_WITH_DIFFERENT_LETTERS
 
-        return Awards.DONT_INTERSECT.value
+        return Awards.FAR
 
-    def near(self, other: Word) -> int:
-        # TODO implement detecting near words
-        return Awards.FAR.value
+    def __min_distance(self, other: Word) -> int:
+        min_distance = MAX_INT
+        for letter1 in self.letters:
+            for letter2 in other.letters:
+                distance = abs(letter1.x - letter2.x) + abs(letter1.y - letter2.y)
+                min_distance = min(min_distance, distance)
+        return min_distance
+
+    def status(self, other: Word) -> int:
+        min_distance = self.__min_distance(other)
+
+        if min_distance == 1:
+            return Awards.NEAR.value
+        elif min_distance < 1:
+            return self.__intersect(other).value
+        else:
+            return Awards.FAR.value
 
     @staticmethod
     def create_from_string(string: str, x: int, y: int, direction: Direction) -> Word:
@@ -124,13 +141,15 @@ class Crossword:
             print(f"|{' '.join(row)}|")
         print("- " * (self.n + 1))
 
+        for word1, word2 in itertools.combinations(self.words, 2):
+            print(f"{word1} and {word2}: {Awards(word1.status(word2))}")
+
     def validate_word_location(self, word: Word) -> bool:
         first_letter = word.letters[0]
         last_letter = word.letters[-1]
 
         for coord in (first_letter.x, first_letter.y, last_letter.x, last_letter.y):
             if (not (0 <= coord < self.n)) or (not (0 <= coord < self.m)):
-                print("wrong!! " + str(word))
                 return False
 
         return True
@@ -162,15 +181,14 @@ class Crossword:
         # Penalize words not fully inside grid
         for word in self.words:
             if not self.validate_word_location(word):
-                score -= 5
+                score -= 15
 
         # Award points for each overlapping letter match
-        for word1 in self.words:
-            for word2 in self.words:
-                if word1 == word2:
-                    continue
+        for word1, word2 in itertools.combinations(self.words, 2):
+            if word1 == word2:
+                continue
 
-                score += word1.intersect(word2)
+            score += word1.status(word2)
 
         return score
 
@@ -181,7 +199,7 @@ def main() -> None:
     crossword = Crossword(array_of_strings, n=5, m=5)
     crossword.visualize()
 
-    print(crossword.fitness())
+    print(f"Value of fitness function : {crossword.fitness()}")
 
 
 if __name__ == "__main__":
