@@ -118,16 +118,15 @@ class Crossword:
     m: int
 
     words: List[Word]
-    strings: List[str]
 
-    def __init__(self, strings: List[str], n: int = 20, m: int = 20):
-        self.strings = strings
-        self.words = []
+    def __init__(self, n: int = 20, m: int = 20, words=None):
+        if words is None:
+            words = []
+
+        self.words = words
 
         self.n = n
         self.m = m
-
-        self.generate_randon_locations()
 
     def visualize(self) -> None:
         grid = [[' ' for _ in range(self.m)] for _ in range(self.n)]
@@ -154,10 +153,10 @@ class Crossword:
 
         return True
 
-    def generate_randon_locations(self) -> None:
-        self.words = []
+    def generate_randon_locations(self, strings: List[str]) -> List[Word]:
+        words = []
 
-        for string in self.strings:
+        for string in strings:
             direction = random.choice(list(Direction))
 
             constraint_x = self.n - 1
@@ -172,25 +171,70 @@ class Crossword:
             y = random.randint(0, constraint_y)
 
             word = Word.create_from_string(string, x, y, direction)
-            self.words.append(word)
+            words.append(word)
 
-    def fitness(self) -> int:
+        return words
+
+
+class EvolutionaryAlgorithm:
+    populations: List[Crossword]
+
+    strings: List[str]
+
+    def __init__(self, strings):
+        self.strings = strings
+
+        self.populations = []
+
+        initial = Crossword(strings)
+        initial.words = initial.generate_randon_locations()
+
+        self.populations.append(initial)
+
+    @staticmethod
+    def fitness(crossword: Crossword) -> int:
+        population = crossword.words
+
         # Award points for each word placed
-        score = len(self.words) * 10
+        score = len(population) * 10
 
         # Penalize words not fully inside grid
-        for word in self.words:
-            if not self.validate_word_location(word):
+        for individual in population:
+            if not crossword.validate_word_location(individual):
                 score -= 15
 
         # Award points for each overlapping letter match
-        for word1, word2 in itertools.combinations(self.words, 2):
+        for word1, word2 in itertools.combinations(population, 2):
             if word1 == word2:
                 continue
 
             score += word1.status(word2)
 
         return score
+
+    @staticmethod
+    def selection(self, population: List[Crossword]):
+
+        # Tournament selection
+        next_generation = []
+        tournament_size = 3
+
+        # Calculate fitness first
+        fitnesses = []
+        for individual in population:
+            fitnesses.append(self.fitness(individual))
+
+        for _ in range(len(population)):
+            # Select individuals based on tournament
+            tournament = random.sample(list(zip(population, fitnesses)), k=tournament_size)
+
+            # Get the fittest individual
+            best = max(tournament, key=lambda x: x[1])[0]
+
+            # Add the winner to next generation
+            next_generation.append(best)
+
+        return next_generation
 
 
 def main() -> None:
@@ -199,7 +243,7 @@ def main() -> None:
     crossword = Crossword(array_of_strings, n=5, m=5)
     crossword.visualize()
 
-    print(f"Value of fitness function : {crossword.fitness()}")
+    print(f"Value of fitness function : {crossword.fitness(crossword.words)}")
 
 
 if __name__ == "__main__":
