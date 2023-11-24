@@ -21,11 +21,11 @@ class Direction(enum.Enum):
 
 
 class Awards(enum.Enum):
-    INTERSECT_WITH_EQUAL_LETTER = 30
+    INTERSECT_WITH_EQUAL_LETTER = 0
     INTERSECT_WITH_DIFFERENT_LETTERS = -10
 
     NEAR = -8
-    FAR = 0
+    FAR = -5
 
 
 class Letter:
@@ -241,6 +241,88 @@ class EvolutionaryAlgorithm:
 
         return next_generation
 
+    def crossover(self, parent1: Crossword, parent2: Crossword) -> tuple[Crossword, Crossword]:
+
+        # Create blank child crosswords
+        child1 = Crossword(n=self.n, m=self.m)
+        child2 = Crossword(n=self.n, m=self.m)
+
+        # Select random cut point
+        cut = random.randint(1, len(parent1.words) - 1)
+
+        # Take first words from parent1
+        child1.words = parent1.words[:cut]
+        # Take last words from parent2
+        child1.words += parent2.words[cut:]
+
+        # Vice versa
+        child2.words = parent2.words[:cut]
+        child2.words += parent1.words[cut:]
+
+        return child1, child2
+
+    @staticmethod
+    def mutate(crossword: Crossword) -> Crossword:
+        # Choose a random word
+        word = random.choice(crossword.words)
+
+        # Choose a mutation type randomly
+        mutation_type = random.choice(["shift", "swap", "flip"])
+
+        if mutation_type == "shift":
+            # Small shift in random direction
+            shift = random.randint(-2, 2)
+            word.x += shift
+
+        elif mutation_type == "swap":
+            # Swap x and y coordinates
+            word.move(word.y, word.x)
+
+        else:
+            # Flip the direction
+            if word.direction == Direction.HORIZONTAL:
+                word.direction = Direction.VERTICAL
+            else:
+                word.direction = Direction.HORIZONTAL
+
+        return crossword
+
+    def run(self):
+
+        generations = 0
+        best_fitness = 0
+
+        while generations < 10000 and best_fitness < 0:
+
+            next_gen = []
+
+            # Selection
+            parents = self.selection(self.populations)
+
+            # Crossover
+            for i in range(0, len(parents), 2):
+                child1, child2 = self.crossover(parents[i], parents[i + 1])
+
+                # Mutation
+                if random.random() < 0.1:
+                    child1 = self.mutate(child1)
+                    child2 = self.mutate(child2)
+
+                next_gen.extend([child1, child2])
+
+                # Calculate fitness
+                for puzzle in next_gen:
+                    fit = self.fitness(puzzle)
+                    if fit > best_fitness:
+                        best_fitness = fit
+
+                # Next generation
+                self.populations = next_gen
+
+                generations += 1
+
+        random.choice(self.populations).visualize()
+
 
 def main() -> None:
     array_of_strings = ["zoo", "goal", "ape"]
@@ -249,6 +331,8 @@ def main() -> None:
     evolution.populations[0].visualize()
 
     print(f"Value of fitness function : {evolution.fitness(evolution.populations[0])}")
+
+    evolution.run()
 
 
 if __name__ == "__main__":
