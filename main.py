@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import copy
 import enum
 import itertools
 import random
@@ -15,24 +16,30 @@ from typing import List
 MAX_INT = sys.maxsize
 
 
+class BadCombinationException(Exception):
+    pass
+
+
 class Direction(enum.Enum):
     HORIZONTAL = 0
     VERTICAL = 1
 
 
 class Awards(enum.Enum):
-    INTERSECT_THROUGH_OTHER_WORDS = 1
     INTERSECT_WITH_EQUAL_LETTER = 0
     INTERSECT_WITH_DIFFERENT_LETTERS = -10
 
     NEAR = -8
-    FAR = -5
+    FAR = 0
 
 
 class Letter:
     x: int
     y: int
     value: str
+
+    word: Word | None
+    connected: Word | None
 
     def __init__(self, x: int, y: int, value: str):
         self.x, self.y = x, y
@@ -122,12 +129,22 @@ class Crossword:
     m: int
 
     words: List[Word]
+    letters: List[Letter]
+    free_letters: List[Letter]
 
-    def __init__(self, n: int = 20, m: int = 20, words=None):
+    def __init__(self, n: int = 20, m: int = 20, letters=None, free_letters=None, words=None):
         if words is None:
             words = []
 
+        if letters is None:
+            letters = []
+
+        if free_letters is None:
+            free_letters = []
+
         self.words = words
+        self.letters = letters
+        self.free_letters = free_letters
 
         self.n = n
         self.m = m
@@ -137,7 +154,8 @@ class Crossword:
 
         for word in self.words:
             for letter in word.letters:
-                grid[letter.x][letter.y] = letter.value
+                if (0 <= letter.x < self.n) and (0 <= letter.y < self.m):
+                    grid[letter.x][letter.y] = letter.value
 
         print("- " * (self.n + 1))
         for row in grid:
@@ -163,45 +181,51 @@ class Crossword:
         return True
 
     def generate_randon_locations(self, strings: List[str]) -> List[Word]:
+        strings_copy = copy.deepcopy(strings)
         words = []
 
-        for string in strings:
-            direction = random.choice(list(Direction))
+        random_string_index = random.randint(0, len(strings_copy) - 1)
+        random_string = strings_copy.pop(random_string_index)
 
-            constraint_x = self.n - 1
-            constraint_y = self.m - 1
+        direction = random.choice(list(Direction))
 
-            if direction == Direction.HORIZONTAL:
-                constraint_x = constraint_x - len(string)
-            if direction == Direction.VERTICAL:
-                constraint_y = constraint_y - len(string)
+        constraint_x = self.n - 1
+        constraint_y = self.m - 1
 
-            x = random.randint(0, constraint_x)
-            y = random.randint(0, constraint_y)
+        if direction == Direction.HORIZONTAL:
+            constraint_x = constraint_x - len(random_string)
+        if direction == Direction.VERTICAL:
+            constraint_y = constraint_y - len(random_string)
 
-            word = Word.create_from_string(string, x, y, direction)
+        starter_word = Word.create_from_string(string=random_string,
+                                               x=random.randint(0, constraint_x),
+                                               y=random.randint(0, constraint_y),
+                                               direction=direction)
+        words.append(starter_word)
+
+        for letter in starter_word.letters:
+            letter.word = starter_word
+            self.letters.append(letter)
+            self.free_letters.append(letter)
+
+        while len(strings_copy) > 0 and len(self.free_letters) > 0:
+            random_letter_index = random.randint(0, len(self.free_letters) - 1)
+            random_letter = self.free_letters.pop(random_letter_index)
+
+            random_string_index = random.randint(0, len(strings_copy) - 1)
+            random_string = strings_copy.pop(random_string_index)
+
+            direction = Direction.HORIZONTAL if random_letter.word.direction == Direction.VERTICAL else Direction.VERTICAL
+
+            coord_x = random_letter.x + (
+                random.randint(-len(random_string) + 1, 0) if direction == Direction.HORIZONTAL else 0)
+            coord_y = random_letter.y + (
+                random.randint(-len(random_string) + 1, 0) if direction == Direction.VERTICAL else 0)
+
+            word = Word.create_from_string(random_string, coord_x, coord_y, direction)
             words.append(word)
 
         return words
-
-    def are_words_connected(self, word1: Word, word2: Word) -> bool:
-        visited = set()
-
-        def dfs(current_word: Word) -> bool:
-            if current_word == word2:
-                return True
-
-            visited.add(current_word)
-
-            for other_word in self.words:
-                if other_word not in visited:
-                    if any(letter1 == letter2 for letter1 in current_word.letters for letter2 in other_word.letters):
-                        if dfs(other_word):
-                            return True
-
-            return False
-
-        return dfs(word1)
 
 
 class EvolutionaryAlgorithm:
@@ -268,34 +292,39 @@ class EvolutionaryAlgorithm:
         return next_generation
 
     def crossover(self, parent1: Crossword, parent2: Crossword) -> tuple[Crossword, Crossword]:
+        # TODO :
+        # make field "connect at" at word to save successful connection
+        # take successful words
+        # other take randomly
 
-        # Create blank child crosswords
-        child1 = Crossword(n=self.n, m=self.m)
-        child2 = Crossword(n=self.n, m=self.m)
-
-        # Select random cut point
-        cut = random.randint(1, len(parent1.words) - 1)
-
-        # Take first words from parent1
-        for word in parent1.words[:cut]:
-            letters = [Letter(l.x, l.y, l.value) for l in word.letters]
-            child1.words.append(Word(letters, word.direction))
-
-        # Take last words from parent2
-        for word in parent2.words[cut:]:
-            letters = [Letter(l.x, l.y, l.value) for l in word.letters]
-            child1.words.append(Word(letters, word.direction))
-
-        # Vice versa
-        for word in parent1.words[cut:]:
-            letters = [Letter(l.x, l.y, l.value) for l in word.letters]
-            child2.words.append(Word(letters, word.direction))
-
-        for word in parent2.words[:cut]:
-            letters = [Letter(l.x, l.y, l.value) for l in word.letters]
-            child2.words.append(Word(letters, word.direction))
-
-        return child1, child2
+        # # Create blank child crosswords
+        # child1 = Crossword(n=self.n, m=self.m)
+        # child2 = Crossword(n=self.n, m=self.m)
+        #
+        # # Select random cut point
+        # cut = random.randint(1, len(parent1.words) - 1)
+        #
+        # # Take first words from parent1
+        # for word in parent1.words[:cut]:
+        #     letters = [Letter(l.x, l.y, l.value) for l in word.letters]
+        #     child1.words.append(Word(letters, word.direction))
+        #
+        # # Take last words from parent2
+        # for word in parent2.words[cut:]:
+        #     letters = [Letter(l.x, l.y, l.value) for l in word.letters]
+        #     child1.words.append(Word(letters, word.direction))
+        #
+        # # Vice versa
+        # for word in parent1.words[cut:]:
+        #     letters = [Letter(l.x, l.y, l.value) for l in word.letters]
+        #     child2.words.append(Word(letters, word.direction))
+        #
+        # for word in parent2.words[:cut]:
+        #     letters = [Letter(l.x, l.y, l.value) for l in word.letters]
+        #     child2.words.append(Word(letters, word.direction))
+        #
+        # return child1, child2
+        return parent1, parent2
 
     @staticmethod
     def mutate(crossword: Crossword) -> Crossword:
@@ -307,74 +336,95 @@ class EvolutionaryAlgorithm:
 
         if mutation_type == "shift":
             # Small shift in random direction
-            shift = random.randint(-2, 2)
-            word.x += shift
+            # shift = random.randint(-2, 2)
+            # word.x += shift
+            pass
 
         elif mutation_type == "swap":
             # Swap x and y coordinates
-            word.move(word.y, word.x, word.direction)
+            # word.move(word.y, word.x, word.direction)
+            pass
 
         else:
             # Flip the direction
-            if word.direction == Direction.HORIZONTAL:
-                word.direction = Direction.VERTICAL
-            else:
-                word.direction = Direction.HORIZONTAL
+            # if word.direction == Direction.HORIZONTAL:
+            #     word.direction = Direction.VERTICAL
+            # else:
+            #     word.direction = Direction.HORIZONTAL
+            pass
 
         return crossword
 
     def run(self):
+        #
+        # generations = 0
+        # best_fitness = -1000
+        #
+        # while generations < 10000 and best_fitness < 0:
+        #
+        #     next_gen = []
+        #
+        #     # Selection
+        #     parents = self.selection(self.populations)
+        #
+        #     # Crossover
+        #     for i in range(0, len(parents), 2):
+        #         child1, child2 = self.crossover(parents[i], parents[i + 1])
+        #
+        #         # Mutation
+        #         if random.random() < 0.1:
+        #             child1 = self.mutate(child1)
+        #             child2 = self.mutate(child2)
+        #
+        #         next_gen.extend([child1, child2])
+        #
+        #         # Calculate fitness
+        #         for puzzle in next_gen:
+        #             fit = self.fitness(puzzle)
+        #             if fit > best_fitness:
+        #                 best_fitness = fit
+        #
+        #         # Next generation
+        #         self.populations = next_gen
+        #
+        #     generations += 1
+        #     print(f"Gen {generations} random:")
+        #     random.choice(self.populations).visualize()
+        #
+        # print(f"After {generations} generations, the best fitness result is {best_fitness}")
+        # print("Best crossword is:")
+        # max(self.populations, key=lambda x: self.fitness(x)).visualize()
 
-        generations = 0
-        best_fitness = -1000
+        max_result = max(self.populations, key=lambda x: self.fitness(x))
+        g = 0
+        while self.fitness(max_result) != 0:
+            self.populations = []
 
-        while generations < 10000 and best_fitness < 0:
+            for _ in range(100):
+                initial = Crossword(n=self.n, m=self.m)
+                initial.words = initial.generate_randon_locations(self.strings)
 
-            next_gen = []
+                self.populations.append(initial)
 
-            # Selection
-            parents = self.selection(self.populations)
 
-            # Crossover
-            for i in range(0, len(parents), 2):
-                child1, child2 = self.crossover(parents[i], parents[i + 1])
+            max_result = max(self.populations, key=lambda x: self.fitness(x))
+            print(f"At generation {g} we have:")
+            max_result.visualize()
+            g += 1
 
-                # Mutation
-                if random.random() < 0.1:
-                    child1 = self.mutate(child1)
-                    child2 = self.mutate(child2)
+        max_result.visualize()
 
-                next_gen.extend([child1, child2])
-
-                # Calculate fitness
-                for puzzle in next_gen:
-                    fit = self.fitness(puzzle)
-                    if fit > best_fitness:
-                        best_fitness = fit
-
-                # Next generation
-                self.populations = next_gen
-
-            generations += 1
-
-        random.choice(self.populations).visualize()
-
-        print(generations, best_fitness)
 
 
 def main() -> None:
-    array_of_strings = ["zoo", "goal", "ape"]
+    array_of_strings = ["wonderful", "goal", "lame", "fullstack"]
 
-    evolution = EvolutionaryAlgorithm(array_of_strings, n=5, m=5)
-    random_choice = random.choice(evolution.populations)
+    evolution = EvolutionaryAlgorithm(array_of_strings, n=20, m=20)
+    # random_choice = random.choice(evolution.populations)
+    #
+    # random_choice.visualize()
 
-    random_choice.visualize()
-
-    print(f"Value of fitness function : {evolution.fitness(random_choice)}")
-
-    for word1, word2 in itertools.combinations(random_choice.words, 2):
-        print(f"{word1} and {word2} are connected? {random_choice.are_words_connected(word1, word2)}")
-
+    # print(f"Value of fitness function : {evolution.fitness(random_choice)}")
 
     evolution.run()
 
