@@ -21,6 +21,7 @@ class Direction(enum.Enum):
 
 
 class Awards(enum.Enum):
+    INTERSECT_THROUGH_OTHER_WORDS = 1
     INTERSECT_WITH_EQUAL_LETTER = 0
     INTERSECT_WITH_DIFFERENT_LETTERS = -10
 
@@ -63,6 +64,9 @@ class Word:
 
     def __eq__(self, other: Word) -> bool:
         return self.length == other.length and all([self.letters[i] == other.letters[i] for i in range(self.length)])
+
+    def __hash__(self):
+        return hash(tuple((letter.x, letter.y, letter.value) for letter in self.letters))
 
     def __intersect(self, other: Word) -> Awards:
         for self_letter in self.letters:
@@ -140,16 +144,21 @@ class Crossword:
             print(f"|{' '.join(row)}|")
         print("- " * (self.n + 1))
 
+        print(f"Words : {self.words}")
         for word1, word2 in itertools.combinations(self.words, 2):
             print(f"{word1} and {word2}: {Awards(word1.status(word2))}")
 
     def validate_word_location(self, word: Word) -> bool:
-        first_letter = word.letters[0]
-        last_letter = word.letters[-1]
 
-        for coord in (first_letter.x, first_letter.y, last_letter.x, last_letter.y):
-            if (not (0 <= coord < self.n)) or (not (0 <= coord < self.m)):
-                return False
+        min_x = min(l.x for l in word.letters)
+        max_x = max(l.x for l in word.letters)
+        if min_x < 0 or max_x >= self.n:
+            return False
+
+        min_y = min(l.y for l in word.letters)
+        max_y = max(l.y for l in word.letters)
+        if min_y < 0 or max_y >= self.m:
+            return False
 
         return True
 
@@ -175,6 +184,25 @@ class Crossword:
 
         return words
 
+    def are_words_connected(self, word1: Word, word2: Word) -> bool:
+        visited = set()
+
+        def dfs(current_word: Word) -> bool:
+            if current_word == word2:
+                return True
+
+            visited.add(current_word)
+
+            for other_word in self.words:
+                if other_word not in visited:
+                    if any(letter1 == letter2 for letter1 in current_word.letters for letter2 in other_word.letters):
+                        if dfs(other_word):
+                            return True
+
+            return False
+
+        return dfs(word1)
+
 
 class EvolutionaryAlgorithm:
     populations: List[Crossword]
@@ -191,17 +219,19 @@ class EvolutionaryAlgorithm:
 
         self.populations = []
 
-        initial = Crossword(n=n, m=m)
-        initial.words = initial.generate_randon_locations(strings)
+        for _ in range(100):
+            initial = Crossword(n=n, m=m)
+            initial.words = initial.generate_randon_locations(strings)
 
-        self.populations.append(initial)
+            self.populations.append(initial)
 
     @staticmethod
     def fitness(crossword: Crossword) -> int:
         population = crossword.words
 
         # Award points for each word placed
-        score = len(population) * 10
+        # score = len(population) * 10
+        score = 0
 
         # Penalize words not fully inside grid
         for individual in population:
@@ -217,26 +247,22 @@ class EvolutionaryAlgorithm:
 
         return score
 
-    @staticmethod
     def selection(self, population: List[Crossword]):
 
         # Tournament selection
         next_generation = []
-        tournament_size = 3
-
-        # Calculate fitness first
-        fitnesses = []
-        for individual in population:
-            fitnesses.append(self.fitness(individual))
-
         for _ in range(len(population)):
-            # Select individuals based on tournament
-            tournament = random.sample(list(zip(population, fitnesses)), k=tournament_size)
 
-            # Get the fittest individual
-            best = max(tournament, key=lambda x: x[1])[0]
+            # Get sample and calculate fitnesses
+            tournament = random.sample(population, min(3, len(population)))
 
-            # Add the winner to next generation
+            fitnesses = []
+            for individual in tournament:
+                fitnesses.append(self.fitness(individual))
+
+            # Identify the most fit individual
+            best = max(zip(tournament, fitnesses), key=lambda x: x[1])[0]
+
             next_generation.append(best)
 
         return next_generation
@@ -251,13 +277,23 @@ class EvolutionaryAlgorithm:
         cut = random.randint(1, len(parent1.words) - 1)
 
         # Take first words from parent1
-        child1.words = parent1.words[:cut]
+        for word in parent1.words[:cut]:
+            letters = [Letter(l.x, l.y, l.value) for l in word.letters]
+            child1.words.append(Word(letters, word.direction))
+
         # Take last words from parent2
-        child1.words += parent2.words[cut:]
+        for word in parent2.words[cut:]:
+            letters = [Letter(l.x, l.y, l.value) for l in word.letters]
+            child1.words.append(Word(letters, word.direction))
 
         # Vice versa
-        child2.words = parent2.words[:cut]
-        child2.words += parent1.words[cut:]
+        for word in parent1.words[cut:]:
+            letters = [Letter(l.x, l.y, l.value) for l in word.letters]
+            child2.words.append(Word(letters, word.direction))
+
+        for word in parent2.words[:cut]:
+            letters = [Letter(l.x, l.y, l.value) for l in word.letters]
+            child2.words.append(Word(letters, word.direction))
 
         return child1, child2
 
@@ -276,7 +312,7 @@ class EvolutionaryAlgorithm:
 
         elif mutation_type == "swap":
             # Swap x and y coordinates
-            word.move(word.y, word.x)
+            word.move(word.y, word.x, word.direction)
 
         else:
             # Flip the direction
@@ -290,7 +326,7 @@ class EvolutionaryAlgorithm:
     def run(self):
 
         generations = 0
-        best_fitness = 0
+        best_fitness = -1000
 
         while generations < 10000 and best_fitness < 0:
 
@@ -319,18 +355,26 @@ class EvolutionaryAlgorithm:
                 # Next generation
                 self.populations = next_gen
 
-                generations += 1
+            generations += 1
 
         random.choice(self.populations).visualize()
+
+        print(generations, best_fitness)
 
 
 def main() -> None:
     array_of_strings = ["zoo", "goal", "ape"]
 
     evolution = EvolutionaryAlgorithm(array_of_strings, n=5, m=5)
-    evolution.populations[0].visualize()
+    random_choice = random.choice(evolution.populations)
 
-    print(f"Value of fitness function : {evolution.fitness(evolution.populations[0])}")
+    random_choice.visualize()
+
+    print(f"Value of fitness function : {evolution.fitness(random_choice)}")
+
+    for word1, word2 in itertools.combinations(random_choice.words, 2):
+        print(f"{word1} and {word2} are connected? {random_choice.are_words_connected(word1, word2)}")
+
 
     evolution.run()
 
