@@ -40,7 +40,7 @@ class Word:
 
     __genetic_string: str
 
-    def __init__(self, x: int, y: int, direction: Direction, value: str):
+    def __init__(self, x: int, y: int, direction: Direction, value: str) -> None:
         self.__x = x
         self.__y = y
         self.__direction = direction
@@ -57,7 +57,7 @@ class Word:
         return self.__x
 
     @x.setter
-    def x(self, x: int):
+    def x(self, x: int) -> None:
         self.__x = x
         self.__update_genetic_string()
 
@@ -66,7 +66,7 @@ class Word:
         return self.__y
 
     @y.setter
-    def y(self, y: int):
+    def y(self, y: int) -> None:
         self.__y = y
         self.__update_genetic_string()
 
@@ -75,7 +75,7 @@ class Word:
         return self.__direction
 
     @direction.setter
-    def direction(self, direction: Direction):
+    def direction(self, direction: Direction) -> None:
         self.__direction = direction
         self.__update_genetic_string()
 
@@ -92,14 +92,14 @@ class Word:
         return self.__genetic_string
 
     @genetic_string.setter
-    def genetic_string(self, genetic_string: str):
+    def genetic_string(self, genetic_string: str) -> None:
         self.__genetic_string = genetic_string
         self.__update_values_from_genetic_string()
 
     def __update_genetic_string(self) -> None:
         self.__genetic_string = self.to_genetic_string(self.x, self.y, self.direction)
 
-    def __update_values_from_genetic_string(self):
+    def __update_values_from_genetic_string(self) -> None:
         x, y, direction = self.parse_genetic_string(self.genetic_string)
         self.__x = x
         self.__y = y
@@ -112,7 +112,7 @@ class Word:
         return int(x), int(y), Direction(direction)
 
     @staticmethod
-    def to_genetic_string(x: int, y: int, direction: Direction):
+    def to_genetic_string(x: int, y: int, direction: Direction) -> str:
         return f"{x},{y},{direction.value}"
 
 
@@ -122,7 +122,7 @@ class Crossword:
     __words: List[Word]
     __strings: List[str]
 
-    def __init__(self, strings: List[str], n: int = 20, m: int = 20):
+    def __init__(self, strings: List[str], n: int = 20, m: int = 20) -> None:
         self.__strings = strings
         self.__n = n
         self.__m = m
@@ -172,7 +172,7 @@ class Crossword:
         return self.__strings
 
     @property
-    def words(self):
+    def words(self) -> List[Word]:
         return self.__words
 
 
