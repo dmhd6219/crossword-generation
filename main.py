@@ -213,14 +213,122 @@ class EvolutionaryAlgorithm:
 
         self.__population = []
 
-    def generate_random_population(self, population_size: int = 100) -> list[Crossword]:
+    def generate_random_population(self, population_size: int = 100) -> List[Crossword]:
         return [Crossword(self.strings, self.n, self.m) for _ in range(population_size)]
 
     def run(self, population_size: int = 100, max_generations: int = 100000) -> None:
         self.__population = self.generate_random_population(population_size)
 
+        for generation in range(max_generations):
+            print(f"Generation {generation}")
+
+            self.__population.sort(key=lambda x: self.fitness(x))
+
+            best_individual = self.__population[0]
+            print(f"Best fitness: {self.fitness(best_individual)}")
+
+            next_population = self.__population[:2]  # Elitism
+
+            for _ in range((population_size - len(next_population)) // 2):
+                parent1 = self.tournament_selection(self.__population)
+                parent2 = self.tournament_selection(self.__population)
+
+                child1, child2 = self.crossover(parent1, parent2)
+                child1 = self.mutation(child1)
+                child2 = self.mutation(child2)
+
+                next_population += [child1, child2]
+
+            self.__population = next_population
+
+        best = self.__population[0]
+        print("Best solution found:")
+        best.print()
+
+    def tournament_selection(self, population: List[Crossword]):
+        # Perform tournament
+        competitors = random.sample(population, k=2)
+        best = max(competitors, key=self.fitness)
+        return best
+
+    @property
+    def population(self) -> List[Crossword]:
+        return self.__population
+
+    @population.setter
+    def population(self, population: List[Crossword]) -> None:
+        self.__population = population
+
+    def check_intersection(self, word1: Word, word2: Word) -> bool:
+        # Check if words are perpendicular
+        if word1.direction == word2.direction:
+            return False
+
+        # Calculate word boundaries
+        x1_start = word1.x
+        x1_end = word1.x + (word1.length if word1.direction == Direction.HORIZONTAL else 0)
+        y1_start = word1.y
+        y1_end = word1.y + (word1.length if word1.direction == Direction.VERTICAL else 0)
+
+        x2_start = word2.x
+        x2_end = word2.x + (word2.length if word2.direction == Direction.HORIZONTAL else 0)
+        y2_start = word2.y
+        y2_end = word2.y + (word2.length if word2.direction == Direction.VERTICAL else 0)
+
+        # Check if boundaries intersect
+        if (x1_start <= x2_start <= x1_end or
+                x2_start <= x1_start <= x2_end):
+            return True
+        if (y1_start <= y2_start <= y1_end or
+                y2_start <= y1_start <= y2_end):
+            return True
+
+        return False
+
+    def calc_distance(self, word1: Word, word2: Word) -> int:
+        min_dist = MAX_INT
+
+        for i1 in range(word1.length):
+            for i2 in range(word2.length):
+                x1 = word1.x + i1 if word1.direction == Direction.HORIZONTAL else word1.x
+                y1 = word1.y + i1 if word1.direction == Direction.VERTICAL else word1.y
+                x2 = word2.x + i2 if word2.direction == Direction.HORIZONTAL else word2.x
+                y2 = word2.y + i2 if word2.direction == Direction.VERTICAL else word2.y
+
+                dist_x = abs(x1 - x2)
+                dist_y = abs(y1 - y2)
+                dist = dist_x + dist_y
+
+                min_dist = min(min_dist, dist)
+
+        return min_dist
+
     def fitness(self, individual: Crossword) -> int:
-        return 0
+        fitness = 0
+
+        # Reward intersecting words
+        for word1 in individual.words:
+            for word2 in individual.words:
+                if word1 != word2:
+                    if self.check_intersection(word1, word2):
+                        if word1.value[0] == word2.value[0]:
+                            fitness += Awards.INTERSECT_WITH_EQUAL_LETTER.value
+                        else:
+                            fitness += Awards.INTERSECT_WITH_DIFFERENT_LETTERS.value
+
+        # Penalize words being too close
+        for i in range(len(individual.words)):
+            for j in range(i + 1, len(individual.words)):
+                word1 = individual.words[i]
+                word2 = individual.words[j]
+
+                dist = self.calc_distance(word1, word2)
+                if dist <= 2:
+                    fitness += Awards.NEAR.value
+                else:
+                    fitness += Awards.FAR.value
+
+        return fitness
 
     def crossover(self, parent1: Crossword, parent2: Crossword) -> tuple[Crossword, Crossword]:
         child1 = Crossword(self.strings, self.n, self.m)
@@ -272,12 +380,8 @@ def main() -> None:
     # array_of_strings = ["wonderful", "goal", "lame", "fullstack", "wario", "organ", "nigger"]
     array_of_strings = ["zoo", "goal", "ape"]
 
-    crossword = Crossword(array_of_strings, n=5, m=5)
-    crossword.print()
-
-    # evolution = EvolutionaryAlgorithm(array_of_strings, n=20, m=20)
-    #
-    # evolution.run()
+    evolution = EvolutionaryAlgorithm(array_of_strings, n=20, m=20)
+    evolution.run()
 
 
 if __name__ == "__main__":
