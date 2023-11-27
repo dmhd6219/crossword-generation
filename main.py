@@ -18,6 +18,10 @@ class BadCombinationException(Exception):
     pass
 
 
+class CrosswordUpdateException(Exception):
+    pass
+
+
 class Direction(enum.Enum):
     HORIZONTAL = 0
     VERTICAL = 1
@@ -122,12 +126,14 @@ class Crossword:
     __words: List[Word]
     __strings: List[str]
 
+    __genetic_string: str
+
     def __init__(self, strings: List[str], n: int = 20, m: int = 20) -> None:
         self.__strings = strings
         self.__n = n
         self.__m = m
 
-        self.__words = self.create_random_crossword()
+        self.words = self.create_random_crossword()
 
     def create_random_crossword(self) -> List[Word]:
         words = []
@@ -159,6 +165,18 @@ class Crossword:
     def check_bounds(self, x: int, y: int) -> bool:
         return 0 <= x < self.n and 0 <= y < self.m
 
+    def get_genetic_string(self) -> str:
+        return ";".join([x.genetic_string for x in self.words])
+
+    def update_from_genetic_string(self, genetic_string: str) -> None:
+        genetic_words = genetic_string.split(";")
+        if len(genetic_words) != len(self.words):
+            raise CrosswordUpdateException(
+                "Can't update crossword from this genetic string - number of words is different")
+
+        for index, word in enumerate(genetic_words):
+            self.words[index].parse_genetic_string(word)
+
     @property
     def n(self) -> int:
         return self.__n
@@ -174,6 +192,80 @@ class Crossword:
     @property
     def words(self) -> List[Word]:
         return self.__words
+
+    @words.setter
+    def words(self, words: List[Word]) -> None:
+        self.__words = words
+        self.__genetic_string = self.get_genetic_string()
+
+
+class EvolutionaryAlgorithm:
+    __strings: List[str]
+    __population: List[Crossword]
+
+    __n: int
+    __m: int
+
+    def __init__(self, strings: List[str], n: int = 20, m: int = 20) -> None:
+        self.__strings = strings
+        self.__n = n
+        self.__m = m
+
+        self.__population = []
+
+    def generate_random_population(self, population_size: int = 100) -> list[Crossword]:
+        return [Crossword(self.strings, self.n, self.m) for _ in range(population_size)]
+
+    def run(self, population_size: int = 100, max_generations: int = 100000) -> None:
+        self.__population = self.generate_random_population(population_size)
+
+    def fitness(self, individual: Crossword) -> int:
+        return 0
+
+    def crossover(self, parent1: Crossword, parent2: Crossword) -> tuple[Crossword, Crossword]:
+        child1 = Crossword(self.strings, self.n, self.m)
+        child2 = Crossword(self.strings, self.n, self.m)
+
+        if len(parent1.words) != len(parent2.words):
+            raise CrosswordUpdateException("Can't make crossover from two Crosswords with different number of words")
+
+        midpoint = random.randint(1, len(parent1.words) - 2)
+
+        child1.words = parent1.words[:midpoint]
+        child1.words += parent2.words[midpoint:]
+
+        child2.words = parent1.words[midpoint:]
+        child2.words += parent2.words[:midpoint]
+
+        return child1, child2
+
+    def mutation(self, individual: Crossword) -> Crossword:
+        word = random.choice(individual.words)
+
+        if random.random() < 0.33:
+            word.x = random.randint(0, self.n - 1)
+        elif random.random() < 0.66:
+            word.y += random.randint(0, self.m - 1)
+        else:
+            word.direction = random.choice(list(Direction))
+
+        return individual
+
+    @property
+    def n(self) -> int:
+        return self.__n
+
+    @property
+    def m(self) -> int:
+        return self.__m
+
+    @property
+    def strings(self) -> List[str]:
+        return self.__strings
+
+    @property
+    def population(self) -> List[Crossword]:
+        return self.__population
 
 
 def main() -> None:
