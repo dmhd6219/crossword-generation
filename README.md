@@ -19,9 +19,10 @@ inputs we guarantee this
 4. All words have to fit the row or column depending on orientation and words
 can’t be cut
 5. Each word has to be crossed by at least one another perpendicular word
-6. Parallel horizontal/vertical words’ symbols shouldn’t be existing for neighbour
+6. Any pair of same orientation words cannot be intersecting
+7. Parallel horizontal/vertical words’ symbols shouldn’t be existing for neighbour
 rows/columns. Exception is first or last word symbols (see Table 1)
-7. No word or set of words can be separated from other words (the graph of all
+8. No word or set of words can be separated from other words (the graph of all
 letters has to be connected)
 
 ![Valid and Invalid cases](readme-files/images/figure1.png)
@@ -35,8 +36,9 @@ be not compiling
 ### Report
 Your report should deeply describe chosen EA algorithm, its flow, fitness function,
 specifics of variation operators and EA parameters in plain English. Statistics demonstrating
-the average and maximum population fitness should be provided. This has to be supported by
-generated plots. You are supposed to use your own 100 tests to provide statistics.
+the average and maximum population fitness at final generations for each number of input
+words should be provided. This has to be supported by generated plots. It means that for Xaxis you should have number of input words and for Y-axis average for max/avg fitness on last
+generations among all tests. You are supposed to use your own 100 tests to provide statistics.
 
 ### Evaluation
 In the root with your code expect *inputs* directory with *M* inputs (*input1.txt* …
