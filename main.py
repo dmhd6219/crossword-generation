@@ -16,10 +16,6 @@ from typing import List
 MAX_INT = sys.maxsize
 
 
-class BadCombinationException(Exception):
-    pass
-
-
 class CrosswordUpdateException(Exception):
     pass
 
@@ -312,7 +308,7 @@ class EvolutionaryAlgorithm:
         word = random.choice(individual.words)
         word_copy = copy.deepcopy(word)
 
-        if random.random() < 0.1:
+        if random.random() < 0.2:
             if random.random() < 0.33:
                 word_copy.x += random.randint(-2, 2)
             elif random.random() < 0.66:
