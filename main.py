@@ -224,14 +224,6 @@ class EvolutionaryAlgorithm:
     def generate_random_population(self, population_size: int = 100) -> List[Crossword]:
         return [Crossword(self.strings, self.n, self.m) for _ in range(population_size)]
 
-    @property
-    def population(self) -> List[Crossword]:
-        return self.__population
-
-    @population.setter
-    def population(self, population: List[Crossword]) -> None:
-        self.__population = population
-
     @staticmethod
     def __calc_distance(word1: Word, word2: Word) -> int:
         min_dist = MAX_INT
@@ -251,7 +243,8 @@ class EvolutionaryAlgorithm:
         return min_dist
 
     @staticmethod
-    def __get_intersection_coords(word1: Word, word2: Word) -> tuple[int, int]:
+    def __get_intersection_coords(word1: Word, word2: Word) -> List[tuple[int, int]]:
+        coords = []
         for i1 in range(word1.length):
             for i2 in range(word2.length):
                 x1 = (word1.x + i1) if word1.direction == Direction.HORIZONTAL else word1.x
@@ -260,9 +253,9 @@ class EvolutionaryAlgorithm:
                 y2 = (word2.y + i2) if word2.direction == Direction.VERTICAL else word2.y
 
                 if (x1 == x2) and (y1 == y2):
-                    return i1, i2
+                    coords.append((i1, i2))
 
-        return -1, -1
+        return coords
 
     def __validate_word_location(self, word: Word) -> bool:
         for i in range(word.length):
@@ -281,15 +274,36 @@ class EvolutionaryAlgorithm:
         if len(parent1.words) != len(parent2.words):
             raise CrosswordUpdateException("Can't make crossover from two Crosswords with different number of words")
 
-        midpoint = random.randint(1, len(parent1.words) - 2)
+        if random.random() < 0.5:
+            midpoint = random.randint(1, len(parent1.words) - 2)
 
-        for i in range(0, midpoint):
-            child1.words[i].x = parent1.words[i].x
-            child2.words[i].x = parent2.words[i].x
+            for i in range(0, midpoint):
+                child1.words[i].x = parent1.words[i].x
+                child2.words[i].x = parent2.words[i].x
 
-        for i in range(midpoint, len(parent1.words) - 1):
-            child1.words[i].x = parent1.words[i].x
-            child2.words[i].x = parent2.words[i].x
+            for i in range(midpoint, len(parent1.words) - 1):
+                child1.words[i].x = parent1.words[i].x
+                child2.words[i].x = parent2.words[i].x
+
+        # предложил алехин; с вероятностью 0.5 мешать i-th ген
+        else:
+            for i in range(len(child1.words)):
+                if random.random() < 0.5:
+                    child1.words[i].x = parent1.words[i].x
+                    child1.words[i].y = parent1.words[i].y
+                    child1.words[i].direction = parent1.words[i].direction
+
+                    child2.words[i].x = parent2.words[i].x
+                    child2.words[i].y = parent2.words[i].y
+                    child2.words[i].direction = parent2.words[i].direction
+                else:
+                    child1.words[i].x = parent2.words[i].x
+                    child1.words[i].y = parent2.words[i].y
+                    child1.words[i].direction = parent2.words[i].direction
+
+                    child2.words[i].x = parent1.words[i].x
+                    child2.words[i].y = parent1.words[i].y
+                    child2.words[i].direction = parent1.words[i].direction
 
         return child1, child2
 
@@ -297,30 +311,27 @@ class EvolutionaryAlgorithm:
         word = random.choice(individual.words)
 
         if random.random() < 0.1:
-            if random.random() < 0.5:
-                if random.random() < 0.33:
-                    word.x += random.randint(-2, 2)
-                elif random.random() < 0.66:
-                    word.y += random.randint(-2, 2)
-                else:
-                    word.direction = random.choice(list(Direction))
+            if random.random() < 0.33:
+                word.x += random.randint(-2, 2)
+            elif random.random() < 0.66:
+                word.y += random.randint(-2, 2)
             else:
-                other_words = [w for w in individual.words if w != word]
-                other_word = random.choice(other_words)
-
-                if other_word.direction == Direction.HORIZONTAL:
-                    word.x = other_word.x
-                    word.y = random.randint(other_word.y - word.length, other_word.y)
-                else:
-                    word.x = random.randint(other_word.x - word.length, other_word.x)
-                    word.y = other_word.y
+                word.direction = random.choice(list(Direction))
 
         return individual
 
-    def selection(self, population: List[Crossword], population_size: int) -> List[Crossword]:
-        sorted_population = sorted(population, key=lambda x: self.fitness(x) + self.award(x))
+    def selection(self, population: List[Crossword]) -> List[Crossword]:
+        next_generation = []
+        tournament_size = 3
 
-        return sorted_population[0:population_size // 10:]
+        for _ in range(len(population)):
+            tournament = random.sample(population, k=tournament_size)
+
+            best = max(tournament, key=lambda x: self.fitness(x))
+
+            next_generation.append(best)
+
+        return next_generation
 
     def fitness(self, individual: Crossword, visualize: bool = False) -> int:
         intersections = 0
@@ -338,11 +349,13 @@ class EvolutionaryAlgorithm:
                 distance = self.__calc_distance(word1, word2)
                 if distance == 0:
                     intersections += 1
-                    has_intersection = True
 
                     intersection_coords = self.__get_intersection_coords(word1, word2)
-                    if word1.value[intersection_coords[0]] != word2.value[intersection_coords[1]]:
-                        incorrect_intersection += 1
+                    if len(intersection_coords) > 1:
+                        incorrect_intersection += len(intersection_coords)
+                    else:
+                        if word1.value[intersection_coords[0][0]] != word2.value[intersection_coords[0][1]]:
+                            incorrect_intersection += 1
 
                 elif distance == 1:
                     near += 1
@@ -353,10 +366,7 @@ class EvolutionaryAlgorithm:
             if not self.__validate_word_location(word1):
                 wrong_location += 1
 
-        if intersections == 0:
-            return -MAX_INT
-
-        result = - ((4 ** have_no_intersection) + (wrong_location ** 5) + (near * 10) + (1 ** incorrect_intersection))
+        result = - ((4 ** have_no_intersection) + (wrong_location ** 2) + (near * 10) + (1 ** incorrect_intersection))
         if visualize:
             print(f"- "
                   f"((4 ** {have_no_intersection}) + "
@@ -378,13 +388,13 @@ class EvolutionaryAlgorithm:
                 if distance == 0:
 
                     intersection_coords = self.__get_intersection_coords(word1, word2)
-                    if word1.value[intersection_coords[0]] == word2.value[intersection_coords[1]]:
+                    if word1.value[intersection_coords[0][0]] == word2.value[intersection_coords[0][1]]:
                         correct_intersections += 1
 
-        result = 5 ** correct_intersections
+        result = correct_intersections ** 2
 
         if visualize:
-            print(f"5 ** {correct_intersections} = {result}")
+            print(f"{correct_intersections}^2 = {result}")
 
         return result
 
@@ -394,9 +404,10 @@ class EvolutionaryAlgorithm:
         for generation in range(max_generations):
             print(f"Generation {generation}")
 
-            best_individuals = self.selection(self.__population, population_size)
+            next_population = [self.mutation(x) for x in self.selection(self.__population)]
 
-            best_crossword = best_individuals[0]
+            best_crossword = sorted(next_population, key=lambda x: self.fitness(x))[0]
+
             best_fitness = self.fitness(best_crossword, visualize=True)
             self.award(best_crossword, visualize=True)
 
@@ -405,13 +416,7 @@ class EvolutionaryAlgorithm:
             if best_fitness == 0:
                 break
 
-            next_population = []
-
-            while len(next_population) < population_size:
-                for parents in itertools.combinations(best_individuals, 2):
-                    next_population += self.crossover(parents[0], parents[1])
-
-            next_population = [self.mutation(x) for x in next_population]
+            next_population = [self.mutation(x) for x in self.selection(self.__population)]
             self.__population = next_population
 
         best = self.__population[0]
@@ -433,6 +438,10 @@ class EvolutionaryAlgorithm:
     @property
     def population(self) -> List[Crossword]:
         return self.__population
+
+    @population.setter
+    def population(self, population: List[Crossword]) -> None:
+        self.__population = population
 
 
 def main() -> None:
