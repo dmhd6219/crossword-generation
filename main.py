@@ -244,6 +244,7 @@ class EvolutionaryAlgorithm:
 
     @staticmethod
     def __get_intersection_coords(word1: Word, word2: Word) -> List[tuple[int, int]]:
+        # TODO : check on correctness
         coords = []
         for i1 in range(word1.length):
             for i2 in range(word2.length):
@@ -309,14 +310,20 @@ class EvolutionaryAlgorithm:
 
     def mutation(self, individual: Crossword) -> Crossword:
         word = random.choice(individual.words)
+        word_copy = copy.deepcopy(word)
 
         if random.random() < 0.1:
             if random.random() < 0.33:
-                word.x += random.randint(-2, 2)
+                word_copy.x += random.randint(-2, 2)
             elif random.random() < 0.66:
-                word.y += random.randint(-2, 2)
+                word_copy.y += random.randint(-2, 2)
             else:
-                word.direction = random.choice(list(Direction))
+                word_copy.direction = random.choice(list(Direction))
+
+        if self.__validate_word_location(word_copy):
+            word.x = word_copy.x
+            word.y = word_copy.y
+            word.direction = word_copy.direction
 
         return individual
 
@@ -445,10 +452,12 @@ class EvolutionaryAlgorithm:
 
 
 def main() -> None:
-    array_of_strings = ["wonderful", "goal", "lame", "fullstack", "wario", "organ", "nigger"]
-    # array_of_strings = ["zoo", "goal", "ape"]
+    # array_of_strings = ["wonderful", "goal", "lame", "fullstack", "wario", "organ", "nigger"]
+    # evolution = EvolutionaryAlgorithm(array_of_strings, n=20, m=20)
 
-    evolution = EvolutionaryAlgorithm(array_of_strings, n=20, m=20)
+    array_of_strings = ["zoo", "goal", "ape"]
+    evolution = EvolutionaryAlgorithm(array_of_strings, n=5, m=5)
+
     evolution.run()
 
 
