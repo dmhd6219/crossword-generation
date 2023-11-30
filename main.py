@@ -163,11 +163,17 @@ class EvolutionaryAlgorithm:
     _strings: List[str]
     _population_size: int
 
+    _n: int
+    _m: int
+
     population: List[Crossword]
 
-    def __init__(self, strings: List[str], population_size: int = 500):
+    def __init__(self, strings: List[str], n: int = 20, m: int = 20, population_size: int = 500):
         self._strings = strings
         self._population_size = population_size
+
+        self._n = n
+        self._m = m
 
         self.population = []
 
@@ -178,6 +184,14 @@ class EvolutionaryAlgorithm:
     @property
     def population_size(self) -> int:
         return self._population_size
+
+    @property
+    def n(self) -> int:
+        return self._n
+
+    @property
+    def m(self) -> int:
+        return self._m
 
     def calculate_fitness(self) -> None:
         for crossword in self.population:
@@ -235,8 +249,35 @@ class EvolutionaryAlgorithm:
 
         return child
 
-    def _mutation(self, population: List[Crossword], mutation_rate: float = 0.5):
-        pass
+    def _mutation(self, initial_population: List[Crossword], mutation_rate: float = 0.5):
+        population = [copy(crossword) for crossword in initial_population]
+
+        for crossword in population:
+            for word in crossword.words:
+                if random.random() < mutation_rate:
+                    random_number = random.random()
+
+                    if random_number < 0.3:
+                        constraint_x = self.n - 1 - (word.length if word.direction == Direction.HORIZONTAL else 0)
+                        word.x = random.randint(0, constraint_x)
+
+                    elif random_number < 0.6:
+                        constraint_y = self.m - 1 - (word.length if word.direction == Direction.VERTICAL else 0)
+                        word.y = random.randint(0, constraint_y)
+
+                    else:
+                        word.direction = random.choice(list(Direction))
+                        if not crossword.word_within_bounds(word):
+                            constraint_x = self.n - 1 - (word.length if word.direction == Direction.HORIZONTAL else 0)
+                            constraint_y = self.m - 1 - (word.length if word.direction == Direction.VERTICAL else 0)
+
+                            word.x = random.randint(0, constraint_x)
+                            word.y = random.randint(0, constraint_y)
+        print(f"Mutation:\n{[str(initial_population[i]) == str(population[i]) for i in range(len(initial_population))]}") # for debug
+        return population
+
+
+
 
 
 def main():
