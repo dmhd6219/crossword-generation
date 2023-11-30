@@ -81,19 +81,27 @@ class Word:
 class Crossword:
     _n: int
     _m: int
+    _strings: List[str]
 
-    words: List[Word]
     fitness: int
+    words: List[Word]
 
-    def __init__(self, genes, n: int = 20, m: int = 20):
+    def __init__(self, strings: List[str], n: int = 20, m: int = 20):
         self._n = n
         self._m = m
 
-        self.words = genes
+        self._strings = strings
         self.calculate_fitness()
+
+        self.words = self._generate_random_positions()
 
     def __str__(self):
         return ";".join([str(x) for x in self.words])
+
+    def __copy__(self) -> Crossword:
+        crossword = Crossword(self.strings, self.n, self.m)
+        crossword.words = [copy(word) for word in self.words]
+        return crossword
 
     @property
     def n(self) -> int:
@@ -102,6 +110,26 @@ class Crossword:
     @property
     def m(self) -> int:
         return self._m
+
+    @property
+    def strings(self) -> List[str]:
+        return self._strings
+
+    def _generate_random_positions(self) -> List[Word]:
+        words = []
+        for word in self.strings:
+            direction = random.choice(list(Direction))
+            constraint_x = self.n - 1 - (len(word) if direction == Direction.HORIZONTAL else 0)
+            constraint_y = self.m - 1 - (len(word) if direction == Direction.VERTICAL else 0)
+
+            words.append(Word(
+                x=random.randint(0, constraint_x),
+                y=random.randint(0, constraint_y),
+                direction=direction,
+                value=word
+            ))
+
+        return words
 
     def within_bounds(self, x: int, y: int) -> bool:
         return (0 <= x < self.n) and (0 <= y < self.m)
@@ -181,7 +209,7 @@ class EvolutionaryAlgorithm:
                 best_fitness = current_best_fitness
                 stagnant_generations = 0
 
-            self.__selection()
+            self._selection()
 
         self.calculate_fitness()
 
@@ -193,13 +221,21 @@ class EvolutionaryAlgorithm:
         print(f"Best fitness: {current_best_fitness}")
         best_individual.print()
 
-    def __selection(self):
+    def _selection(self, population: List[Crossword]) -> List[Crossword]:
         pass
 
-    def __crossover(self, parent1, parent2):
-        pass
+    def _crossover(self, parent1: Crossword, parent2: Crossword, crossover_rate: float = 0.5) -> Crossword:
+        child = copy(parent1)
 
-    def __mutation(self, selection, mutation_rate):
+        for i in range(len(parent1.words)):
+            if random.random() < crossover_rate:
+                child.words[i].x = parent2.words[i].x
+                child.words[i].y = parent2.words[i].y
+                child.words[i].direction = parent2.words[i].direction
+
+        return child
+
+    def _mutation(self, population: List[Crossword], mutation_rate: float = 0.5):
         pass
 
 
