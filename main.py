@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import sys
 from enum import Enum
-from copy import copy, deepcopy
+from copy import deepcopy, copy
 import random
 from typing import List
 
@@ -87,13 +87,14 @@ class Crossword:
     words: List[Word]
 
     def __init__(self, strings: List[str], n: int = 20, m: int = 20):
+        self._strings = strings
         self._n = n
         self._m = m
 
         self._strings = strings
-        self.calculate_fitness()
 
         self.words = self._generate_random_positions()
+        self.update_fitness()
 
     def __str__(self):
         return ";".join([str(x) for x in self.words])
@@ -101,6 +102,7 @@ class Crossword:
     def __copy__(self) -> Crossword:
         crossword = Crossword(self.strings, self.n, self.m)
         crossword.words = [copy(word) for word in self.words]
+        crossword.fitness = self.fitness
         return crossword
 
     @property
@@ -115,16 +117,30 @@ class Crossword:
     def strings(self) -> List[str]:
         return self._strings
 
+    def generate_safe_x_from_word(self, word: Word) -> int:
+        constraint = self.n - 1 - (word.length if word.direction == Direction.HORIZONTAL else 0)
+        return random.randint(0, constraint)
+
+    def generate_safe_y_from_word(self, word: Word) -> int:
+        constraint = self.m - 1 - (word.length if word.direction == Direction.VERTICAL else 0)
+        return random.randint(0, constraint)
+
+    def generate_safe_x_from_string(self, word: str, direction: Direction) -> int:
+        constraint = self.n - 1 - (len(word) if direction == Direction.HORIZONTAL else 0)
+        return random.randint(0, constraint)
+
+    def generate_safe_y_from_string(self, word: str, direction: Direction) -> int:
+        constraint = self.m - 1 - (len(word) if direction == Direction.VERTICAL else 0)
+        return random.randint(0, constraint)
+
     def _generate_random_positions(self) -> List[Word]:
         words = []
         for word in self.strings:
             direction = random.choice(list(Direction))
-            constraint_x = self.n - 1 - (len(word) if direction == Direction.HORIZONTAL else 0)
-            constraint_y = self.m - 1 - (len(word) if direction == Direction.VERTICAL else 0)
 
             words.append(Word(
-                x=random.randint(0, constraint_x),
-                y=random.randint(0, constraint_y),
+                x=self.generate_safe_x_from_string(word, direction),
+                y=self.generate_safe_y_from_string(word, direction),
                 direction=direction,
                 value=word
             ))
@@ -154,28 +170,28 @@ class Crossword:
         for row in matrix:
             print(f'|{"".join(row)}|')
         print(" " + " - " * self.m + " ")
+        print("\n")
 
-    def calculate_fitness(self) -> None:
+    def update_fitness(self):
         pass
 
 
 class EvolutionaryAlgorithm:
     _strings: List[str]
-    _population_size: int
 
     _n: int
     _m: int
+    _population_size: int
 
     population: List[Crossword]
 
-    def __init__(self, strings: List[str], n: int = 20, m: int = 20, population_size: int = 500):
+    def __init__(self, strings: List[str], n: int = 20, m: int = 20, population_size: int = 100):
         self._strings = strings
-        self._population_size = population_size
-
         self._n = n
         self._m = m
+        self._population_size = population_size
 
-        self.population = []
+        self.population = self.generate_random_population(population_size)
 
     @property
     def strings(self) -> List[str]:
@@ -193,64 +209,40 @@ class EvolutionaryAlgorithm:
     def m(self) -> int:
         return self._m
 
-    def calculate_fitness(self) -> None:
+    def calculate_fitnesses(self) -> None:
         for crossword in self.population:
-            crossword.calculate_fitness()
+            crossword.update_fitness()
 
-    def find_best_individual(self) -> Crossword:
-        return max(self.population, key=lambda x: x.fitness)
+    def generate_random_population(self, population_size=300):
+        return [Crossword(self.strings, self.m, self.n) for _ in range(population_size)]
 
-    def run(self, max_generation=20000):
-        best_fitness = MAX_INT
-        stagnant_generations = 0
+    def _selection(self, initial_population: List[Crossword], best_individuals_percentage=0.2):
+        population = [copy(crossword) for crossword in initial_population]
 
-        for generation in range(max_generation):
-            print(f"Generation {generation}")
-            self.calculate_fitness()
+        best_individuals = population[:int(len(population) * best_individuals_percentage)]
 
-            best_individual = self.find_best_individual()
+        # select the rest of the individuals randomly
+        rest_individuals_len = len(population) - int(len(population) * best_individuals_percentage)
+        rest_individuals = random.sample(population[:], rest_individuals_len)
 
-            current_best_fitness = best_individual.fitness
-            print(f"Best fitness: {current_best_fitness}")
-            best_individual.print()
+        new_individuals = [
+            self._crossover(
+                self._tournament_selection(rest_individuals),
+                self._tournament_selection(rest_individuals)
+            )
+            for _ in range(len(rest_individuals))
+        ]
 
-            if current_best_fitness == 0:
-                break
+        # perform mutation on the new individuals
+        new_individuals = self._mutation(new_individuals, 0.03)
+        new_population = best_individuals + new_individuals
+        return new_population
 
-            if current_best_fitness == best_fitness:
-                stagnant_generations += 1
-            else:
-                best_fitness = current_best_fitness
-                stagnant_generations = 0
-
-            self._selection()
-
-        self.calculate_fitness()
-
-        self.calculate_fitness()
-
-        best_individual = self.find_best_individual()
-
-        current_best_fitness = best_individual.fitness
-        print(f"Best fitness: {current_best_fitness}")
-        best_individual.print()
-
-    def _tournament_selection(self, population: List[Crossword]) -> Crossword:
-        return max(random.sample(population, k=3), key=lambda x: x.fitness)
-
-    def _selection(self, initial_population: List[Crossword], selection_rate: float = 0.1) -> List[Crossword]:
-        population = sorted([copy(crossword) for crossword in initial_population], key=lambda x: x.fitness)
-
-        best_individuals = population[:int(len(population) * selection_rate):]
-        rest_individuals = population[int(len(population) * selection_rate)::]
-
-        new_population = [self._crossover(
-            self._tournament_selection(rest_individuals), self._tournament_selection(rest_individuals))]
-
-        return best_individuals + self._mutation(new_population)
+    def _tournament_selection(self, population: List[Crossword], tournament_size=3):
+        return max(random.sample(population, k=tournament_size), key=lambda x: x.fitness)
 
     def _crossover(self, parent1: Crossword, parent2: Crossword, crossover_rate: float = 0.5) -> Crossword:
-        child = copy(parent1)
+        child = deepcopy(parent1)
 
         for i in range(len(parent1.words)):
             if random.random() < crossover_rate:
@@ -260,19 +252,19 @@ class EvolutionaryAlgorithm:
 
         return child
 
-    def _mutation(self, initial_population: List[Crossword], mutation_rate: float = 0.5):
+    def _mutation(self, initial_population: List[Crossword], mutation_rate: float = 0.01):
         population = [copy(crossword) for crossword in initial_population]
 
         for crossword in population:
             for word in crossword.words:
                 if random.random() < mutation_rate:
-                    random_number = random.random()
+                    mutation_probability = random.random()
 
-                    if random_number < 0.3:
+                    if mutation_probability < 0.3:
                         constraint_x = self.n - 1 - (word.length if word.direction == Direction.HORIZONTAL else 0)
                         word.x = random.randint(0, constraint_x)
 
-                    elif random_number < 0.6:
+                    elif mutation_probability < 0.6:
                         constraint_y = self.m - 1 - (word.length if word.direction == Direction.VERTICAL else 0)
                         word.y = random.randint(0, constraint_y)
 
@@ -284,14 +276,46 @@ class EvolutionaryAlgorithm:
 
                             word.x = random.randint(0, constraint_x)
                             word.y = random.randint(0, constraint_y)
-        print(
-            f"Mutation:\n{[str(initial_population[i]) == str(population[i]) for i in range(len(initial_population))]}")  # for debug
+
         return population
+
+    def run(self, max_generation=20000):
+        best_fitness = MAX_INT
+        stagnant_generations = 0
+
+        for i in range(max_generation):
+            self.calculate_fitnesses()
+
+            self.population.sort(key=lambda x: x.fitness)
+
+            current_best_fitness = self.population[0].fitness
+            print(f"Best fitness: {current_best_fitness}")
+
+            self.population[0].print()
+            print(f"Generation: {i}")
+
+            if current_best_fitness == 0:
+                break
+
+            if current_best_fitness == best_fitness:
+                stagnant_generations += 1
+            else:
+                best_fitness = current_best_fitness
+                stagnant_generations = 0
+
+            self.population = self._selection(self.population)
+
+        self.calculate_fitnesses()
+
+        self.population.sort(key=lambda x: x.fitness)
+
+        self.population[0].update_fitness()
+        print(f"Best fitness: {self.population[0].fitness}")
+        self.population[0].print()
 
 
 def main():
-    crossword = EvolutionaryAlgorithm(population_size=500,
-                                      strings=["wonderful", "goal", "lame", "fullstack", "wario", "organ", "nigger"])
+    crossword = EvolutionaryAlgorithm(["wonderful", "goal", "lame", "fullstack", "warioorgan", "nigger"])
     crossword.run()
 
 
