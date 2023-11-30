@@ -72,11 +72,20 @@ class Crossword:
     _strings: List[str]
     words: List[Word]
 
+    _fitness: int
+
     def __init__(self, strings: List[str], n: int = 20, m: int = 20):
         self._strings = strings
         self._n = n
         self._m = m
+
         self.words = self._generate_random_positions()
+        self._fitness = -MAX_INT
+
+    def __copy__(self) -> Crossword:
+        crossword = Crossword(self.strings, self.n, self.m)
+        crossword.words = [copy.copy(x) for x in self.words]
+        return crossword
 
     @property
     def n(self) -> int:
@@ -89,6 +98,16 @@ class Crossword:
     @property
     def strings(self) -> List[str]:
         return self._strings
+
+    @property
+    def fitness(self) -> int:
+        return self.fitness
+
+    def calculate_fitness(self) -> int:
+        # TODO
+        for _ in self.words:
+            pass
+        return -MAX_INT
 
     def check_bounds(self, x: int, y: int):
         return (0 <= x < self.n) and (0 <= y < self.m)
@@ -129,14 +148,11 @@ class EvolutionaryAlgorithm:
     _strings: List[str]
     population: List[Crossword]
 
-    _population_size: int
-
     _n: int
     _m: int
 
-    def __init__(self, strings: List[str], population_size: int = 100, n: int = 20, m: int = 20):
+    def __init__(self, strings: List[str], n: int = 20, m: int = 20):
         self._strings = strings
-        self._population_size = population_size
         self._n = n
         self._m = m
         self.population = []
@@ -146,10 +162,6 @@ class EvolutionaryAlgorithm:
         return self._strings
 
     @property
-    def population_size(self) -> int:
-        return self._population_size
-
-    @property
     def n(self) -> int:
         return self._n
 
@@ -157,25 +169,115 @@ class EvolutionaryAlgorithm:
     def m(self) -> int:
         return self._m
 
-    def crossover(self):
-        pass
+    @staticmethod
+    def crossover(parent1: Crossword, parent2: Crossword) -> Crossword:
+        number_of_genes_to_exchange = random.randint(1, len(parent1.words) - 1)
 
-    def mutation(self):
-        pass
+        child = copy.copy(parent1)
 
-    def selection(self):
-        pass
+        for i in range(number_of_genes_to_exchange):
+            index_to_exchange = random.randint(0, len(parent1.words) - 1)
 
-    def fitness(self):
-        pass
+            child.words[index_to_exchange] = copy.copy(parent2.words[index_to_exchange])
+        return child
 
-    def run(self):
-        pass
+    def mutation(self, initial_population: List[Crossword], mutation_rate: float = 0.5) -> List[Crossword]:
+        population = copy.copy(initial_population)
+
+        for crossword in population:
+            for word in crossword.words:
+
+                if random.random() < mutation_rate:
+                    if word.direction == Direction.VERTICAL:
+                        word.x = random.randint(0, self.n - word.length)
+                    else:
+                        word.x = random.randint(0, self.n - 1)
+
+                if random.random() < mutation_rate:
+                    if word.direction == Direction.HORIZONTAL:
+                        word.y = random.randint(0, self.m - word.length)
+                    else:
+                        word.y = random.randint(0, self.m - 1)
+
+                if random.random() < mutation_rate:
+                    word.direction = random.choice(list(Direction))
+                    if word.direction == Direction.VERTICAL:
+                        if word.y_position + word.length > self.m:
+                            word.y_position = random.randint(0, self.m - word.length)
+                    else:
+                        if word.x_position + word.length > self.n:
+                            word.x_position = random.randint(0, self.n - word.length)
+
+        return population
+
+    @staticmethod
+    def _tournament_selection(population: List[Crossword]) -> Crossword:
+        return max(random.sample(population, 3), key=lambda x: x.fitness)
+
+    def selection(self, percentage: float = 0.2) -> List[Crossword]:
+        population = copy.copy(sorted(self.population, key=lambda x: x.fitness))
+        best_individuals = population[:int(len(population) * percentage)]
+
+        rest_individuals_len = len(population) - int(len(population) * percentage)
+        rest_individuals = random.sample(population[:], rest_individuals_len)
+
+        new_individuals = []
+        for i in range(len(rest_individuals)):
+            new_individuals.append(
+                self.crossover(self._tournament_selection(population), self._tournament_selection(population)))
+
+        new_individuals = self.mutation(new_individuals, 0.03)
+        new_population = best_individuals + new_individuals
+        return new_population
+
+    def update_fitness(self):
+        for crossword in self.population:
+            crossword.calculate_fitness()
+
+    def find_best_crossword(self, visualize: bool = False) -> Crossword:
+        population = sorted(self.population, key=lambda x: x.fitness)
+        current_best_fitness = population[0].fitness
+
+        if visualize:
+            print(f"Best fitness: {current_best_fitness}")
+            self.population[0].print()
+
+        return population[0]
+
+    def run(self, population_size: int = 100, max_generations: int = 1000, depth: int = 0):
+        best_fitness = MAX_INT
+        stagnant_generations = 0
+
+        for generation in range(max_generations):
+            print(f"Generation {generation}")
+
+            self.update_fitness()
+            best_crossword = self.find_best_crossword()
+
+            if best_crossword.fitness == 0:
+                break
+
+            if best_crossword.fitness == best_fitness:
+                stagnant_generations += 1
+            else:
+                best_fitness = best_crossword.fitness
+                stagnant_generations = 0
+
+            if stagnant_generations > 300:
+                self.run(population_size=population_size, max_generations=max_generations, depth=depth + 1)
+
+            if depth >= 5:
+                return
+
+            self.population = self.selection()
+
+        self.update_fitness()
+        self.find_best_crossword(visualize=True)
 
 
 def main() -> None:
     array_of_strings = ["wonderful", "goal", "lame", "fullstack", "wario", "organ", "nigger"]
-    evolution = EvolutionaryAlgorithm(array_of_strings, population_size=100, n=20, m=20)
+    evolution = EvolutionaryAlgorithm(array_of_strings, n=20, m=20)
 
     # array_of_strings = ["zoo", "goal", "ape"]
     # evolution = EvolutionaryAlgorithm(array_of_strings, n=20, m=20)
