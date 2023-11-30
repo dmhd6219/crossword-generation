@@ -235,6 +235,9 @@ class EvolutionaryAlgorithm:
         print(f"Best fitness: {current_best_fitness}")
         best_individual.print()
 
+    def _tournament_selection(self, population: List[Crossword]) -> Crossword:
+        return max(random.sample(population, k=3), key=lambda x: x.fitness)
+
     def _selection(self, population: List[Crossword]) -> List[Crossword]:
         pass
 
@@ -273,11 +276,9 @@ class EvolutionaryAlgorithm:
 
                             word.x = random.randint(0, constraint_x)
                             word.y = random.randint(0, constraint_y)
-        print(f"Mutation:\n{[str(initial_population[i]) == str(population[i]) for i in range(len(initial_population))]}") # for debug
+        print(
+            f"Mutation:\n{[str(initial_population[i]) == str(population[i]) for i in range(len(initial_population))]}")  # for debug
         return population
-
-
-
 
 
 def main():
