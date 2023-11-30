@@ -238,8 +238,16 @@ class EvolutionaryAlgorithm:
     def _tournament_selection(self, population: List[Crossword]) -> Crossword:
         return max(random.sample(population, k=3), key=lambda x: x.fitness)
 
-    def _selection(self, population: List[Crossword]) -> List[Crossword]:
-        pass
+    def _selection(self, initial_population: List[Crossword], selection_rate: float = 0.1) -> List[Crossword]:
+        population = sorted([copy(crossword) for crossword in initial_population], key=lambda x: x.fitness)
+
+        best_individuals = population[:int(len(population) * selection_rate):]
+        rest_individuals = population[int(len(population) * selection_rate)::]
+
+        new_population = [self._crossover(
+            self._tournament_selection(rest_individuals), self._tournament_selection(rest_individuals))]
+
+        return best_individuals + self._mutation(new_population)
 
     def _crossover(self, parent1: Crossword, parent2: Crossword, crossover_rate: float = 0.5) -> Crossword:
         child = copy(parent1)
