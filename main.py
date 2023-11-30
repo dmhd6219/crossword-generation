@@ -49,7 +49,7 @@ class Word:
         self._length = len(value)
 
     def __str__(self) -> str:
-        return self.value
+        return f"{self.x},{self.y},{self.direction.value}"
 
     def __repr__(self) -> str:
         return f"Word<x=[{self.x}], y=[{self.y}], direction=[{self.direction}], value=[{self.value}]>"
@@ -82,10 +82,14 @@ class Crossword:
         self.words = self._generate_random_positions()
         self._fitness = -MAX_INT
 
+    def __str__(self) -> str:
+        return ";".join([str(x) for x in self.words])
+
     def __copy__(self) -> Crossword:
         crossword = Crossword(self.strings, self.n, self.m)
         crossword.words = [copy.copy(x) for x in self.words]
         return crossword
+
 
     @property
     def n(self) -> int:
@@ -101,16 +105,85 @@ class Crossword:
 
     @property
     def fitness(self) -> int:
-        return self.fitness
+        return self._fitness
 
-    def calculate_fitness(self) -> int:
-        # TODO
-        for _ in self.words:
-            pass
-        return -MAX_INT
+    def calculate_fitness(self) -> None:
+        intersections = 0
+        incorrect_intersection = 0
+        near = 0
+        wrong_location = 0
+        have_no_intersection = 0
+
+        for word1 in self.words:
+            has_intersection = False
+            for word2 in self.words:
+                if word1 == word2:
+                    continue
+
+                distance = self.__calc_distance(word1, word2)
+                if distance == 0:
+                    intersections += 1
+
+                    intersection_coords = self.__get_intersection_coords(word1, word2)
+                    if len(intersection_coords) > 1:
+                        incorrect_intersection += len(intersection_coords)
+                    else:
+                        if word1.value[intersection_coords[0][0]] != word2.value[intersection_coords[0][1]]:
+                            incorrect_intersection += 1
+
+                elif distance == 1:
+                    near += 1
+
+            if not has_intersection:
+                have_no_intersection += 1
+
+            if not self.check_word_bounds(word1):
+                wrong_location += 1
+
+        self._fitness = -(incorrect_intersection + near + wrong_location + have_no_intersection)
+
+    @staticmethod
+    def __calc_distance(word1: Word, word2: Word) -> int:
+        min_dist = MAX_INT
+
+        for i1 in range(word1.length):
+            for i2 in range(word2.length):
+                x1 = (word1.x + i1) if word1.direction == Direction.HORIZONTAL else word1.x
+                y1 = (word1.y + i1) if word1.direction == Direction.VERTICAL else word1.y
+                x2 = (word2.x + i2) if word2.direction == Direction.HORIZONTAL else word2.x
+                y2 = (word2.y + i2) if word2.direction == Direction.VERTICAL else word2.y
+
+                dist_x = abs(x1 - x2) if y1 == y2 else MAX_INT
+                dist_y = abs(y1 - y2) if x1 == x2 else MAX_INT
+
+                min_dist = min(min_dist, dist_x, dist_y)
+
+        return min_dist
+
+    @staticmethod
+    def __get_intersection_coords(word1: Word, word2: Word) -> List[tuple[int, int]]:
+        # TODO : check on correctness
+        coords = []
+        for i1 in range(word1.length):
+            for i2 in range(word2.length):
+                x1 = (word1.x + i1) if word1.direction == Direction.HORIZONTAL else word1.x
+                y1 = (word1.y + i1) if word1.direction == Direction.VERTICAL else word1.y
+                x2 = (word2.x + i2) if word2.direction == Direction.HORIZONTAL else word2.x
+                y2 = (word2.y + i2) if word2.direction == Direction.VERTICAL else word2.y
+
+                if (x1 == x2) and (y1 == y2):
+                    coords.append((i1, i2))
+
+        return coords
 
     def check_bounds(self, x: int, y: int):
         return (0 <= x < self.n) and (0 <= y < self.m)
+
+    def check_word_bounds(self, word: Word) -> bool:
+        x = word.x
+        y = word.y
+
+        return self.check_bounds(x, y)
 
     def print(self) -> None:
         matrix = [[" . " for _ in range(0, self.m)] for _ in range(0, self.n)]
@@ -169,6 +242,9 @@ class EvolutionaryAlgorithm:
     def m(self) -> int:
         return self._m
 
+    def generate_random_population(self, population_size: int) -> List[Crossword]:
+        return [Crossword(self.strings, self.n, self.m) for _ in range(population_size)]
+
     @staticmethod
     def crossover(parent1: Crossword, parent2: Crossword) -> Crossword:
         number_of_genes_to_exchange = random.randint(1, len(parent1.words) - 1)
@@ -179,34 +255,47 @@ class EvolutionaryAlgorithm:
             index_to_exchange = random.randint(0, len(parent1.words) - 1)
 
             child.words[index_to_exchange] = copy.copy(parent2.words[index_to_exchange])
+
+        # print(f"------\n Crossover: {str(parent1)} + {str(parent2)} = {str(child)}\n -----------")
         return child
 
     def mutation(self, initial_population: List[Crossword], mutation_rate: float = 0.5) -> List[Crossword]:
-        population = copy.copy(initial_population)
+        population = []
 
-        for crossword in population:
+        for crossword in initial_population:
+            new_crossword = copy.copy(crossword)
+            new_words = []
+
             for word in crossword.words:
+                new_word = copy.copy(word)
 
                 if random.random() < mutation_rate:
-                    if word.direction == Direction.VERTICAL:
-                        word.x = random.randint(0, self.n - word.length)
+                    if new_word.direction == Direction.VERTICAL:
+                        new_word.x = random.randint(0, self.n - new_word.length)
                     else:
-                        word.x = random.randint(0, self.n - 1)
+                        new_word.x = random.randint(0, self.n - 1)
 
                 if random.random() < mutation_rate:
-                    if word.direction == Direction.HORIZONTAL:
-                        word.y = random.randint(0, self.m - word.length)
+                    if new_word.direction == Direction.HORIZONTAL:
+                        new_word.y = random.randint(0, self.m - new_word.length)
                     else:
-                        word.y = random.randint(0, self.m - 1)
+                        new_word.y = random.randint(0, self.m - 1)
 
                 if random.random() < mutation_rate:
-                    word.direction = random.choice(list(Direction))
-                    if word.direction == Direction.VERTICAL:
-                        if word.y_position + word.length > self.m:
-                            word.y_position = random.randint(0, self.m - word.length)
+                    new_word.direction = random.choice(list(Direction))
+                    if new_word.direction == Direction.VERTICAL:
+                        if new_word.y + new_word.length > self.m:
+                            new_word.y = random.randint(0, self.m - new_word.length)
                     else:
-                        if word.x_position + word.length > self.n:
-                            word.x_position = random.randint(0, self.n - word.length)
+                        if new_word.x + new_word.length > self.n:
+                            new_word.x = random.randint(0, self.n - new_word.length)
+                new_words.append(new_word)
+
+            new_crossword.words = new_words
+            population.append(new_crossword)
+
+        # print(f"-------\n Mutation: \n{[str(x) for x in initial_population]} -> \n{[str(x) for x in population]} \n------")
+        # print([str(initial_population[i]) == str(population[i]) for i in range(len(initial_population))])
 
         return population
 
@@ -214,8 +303,8 @@ class EvolutionaryAlgorithm:
     def _tournament_selection(population: List[Crossword]) -> Crossword:
         return max(random.sample(population, 3), key=lambda x: x.fitness)
 
-    def selection(self, percentage: float = 0.2) -> List[Crossword]:
-        population = copy.copy(sorted(self.population, key=lambda x: x.fitness))
+    def selection(self, initial_population: List[Crossword], percentage: float = 0.2) -> List[Crossword]:
+        population = copy.copy(sorted(initial_population, key=lambda x: x.fitness))
         best_individuals = population[:int(len(population) * percentage)]
 
         rest_individuals_len = len(population) - int(len(population) * percentage)
@@ -228,6 +317,10 @@ class EvolutionaryAlgorithm:
 
         new_individuals = self.mutation(new_individuals, 0.03)
         new_population = best_individuals + new_individuals
+
+        # print(
+        #     f"-------\n Selection: \n{[str(x) for x in initial_population]} -> \n{[str(x) for x in population]} \n------")
+        # print([str(initial_population[i]) == str(population[i]) for i in range(len(initial_population))])
         return new_population
 
     def update_fitness(self):
@@ -248,11 +341,15 @@ class EvolutionaryAlgorithm:
         best_fitness = MAX_INT
         stagnant_generations = 0
 
+        self.population = self.generate_random_population(population_size)
+
         for generation in range(max_generations):
             print(f"Generation {generation}")
 
             self.update_fitness()
             best_crossword = self.find_best_crossword()
+            print(f"Best fitness : {best_crossword.fitness}")
+            best_crossword.print()
 
             if best_crossword.fitness == 0:
                 break
@@ -269,7 +366,7 @@ class EvolutionaryAlgorithm:
             if depth >= 5:
                 return
 
-            self.population = self.selection()
+            self.population = self.selection(self.population)
 
         self.update_fitness()
         self.find_best_crossword(visualize=True)
