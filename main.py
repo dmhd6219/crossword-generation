@@ -6,9 +6,6 @@ from copy import copy, deepcopy
 import random
 from typing import List
 
-Y_POSITION_MAX = 20
-X_POSITION_MAX = 20
-
 MAX_INT = sys.maxsize
 
 
