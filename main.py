@@ -200,7 +200,7 @@ class Crossword:
             return (word1.x <= word2.x < word1.x + len(word1.value) and
                     word2.y <= word1.y < word2.y + len(word2.value))
 
-    def check_letter_match(self, word1: Word, word2:Word) -> bool:
+    def check_letter_match(self, word1: Word, word2: Word) -> bool:
         if word1.direction == Direction.VERTICAL:
             return word1.value[word2.y - word1.y] == word2.value[word1.x - word2.x]
         else:
@@ -296,10 +296,11 @@ class EvolutionaryAlgorithm:
     def _selection(self, initial_population: List[Crossword], best_individuals_percentage=0.2):
         population = [copy(crossword) for crossword in initial_population]
 
-        best_individuals = population[:int(len(population) * best_individuals_percentage)]
+        best_individuals_length = int(len(population) * best_individuals_percentage)
+        rest_individuals_length = len(population) - best_individuals_length
 
-        rest_individuals_len = len(population) - int(len(population) * best_individuals_percentage)
-        rest_individuals = random.sample(population[:], rest_individuals_len)
+        best_individuals = population[:best_individuals_length]
+        rest_individuals = random.sample(population[:], rest_individuals_length)
 
         new_individuals = [
             self._crossover(
@@ -309,16 +310,13 @@ class EvolutionaryAlgorithm:
             for _ in range(len(rest_individuals))
         ]
 
-        # perform mutation on the new individuals
-        new_individuals = self._mutate_population(new_individuals)
-        new_population = best_individuals + new_individuals
-        return new_population
+        return best_individuals + self._mutate_population(new_individuals)
 
     def _tournament_selection(self, population: List[Crossword], tournament_size=3):
         return min(random.sample(population, k=tournament_size), key=lambda x: x.fitness)
 
     def _crossover(self, parent1: Crossword, parent2: Crossword, crossover_rate: float = 0.5) -> Crossword:
-        child = deepcopy(parent1)
+        child = copy(parent1)
 
         for i in range(len(parent1.words)):
             if random.random() < crossover_rate:
@@ -329,12 +327,7 @@ class EvolutionaryAlgorithm:
         return child
 
     def _mutate_population(self, initial_population: List[Crossword], mutation_rate: float = 0.01):
-        population = [copy(crossword) for crossword in initial_population]
-
-        for i in range(len(population)):
-            population[i] = self._mutate(population[i], mutation_rate)
-
-        return population
+        return [self._mutate(x, mutation_rate) for x in [copy(crossword) for crossword in initial_population]]
 
     def _mutate(self, initial_individual: Crossword, mutation_rate: float = 0.01) -> Crossword:
         individual = copy(initial_individual)
@@ -343,28 +336,19 @@ class EvolutionaryAlgorithm:
             if random.random() < mutation_rate:
                 mutation_probability = random.random()
 
-                if mutation_probability < 0.3:
-                    constraint_x = self.n - 1 - (word.length if word.direction == Direction.HORIZONTAL else 0)
-                    word.x = random.randint(0, constraint_x)
+                if mutation_probability < 0.33:
+                    word.x = random.randint(0, individual.generate_safe_x_from_word(word))
 
-                elif mutation_probability < 0.6:
-                    constraint_y = self.m - 1 - (word.length if word.direction == Direction.VERTICAL else 0)
-                    word.y = random.randint(0, constraint_y)
+                elif mutation_probability < 0.66:
+                    word.y = random.randint(0, individual.generate_safe_y_from_word(word))
 
                 else:
                     word.direction = random.choice(list(Direction))
                     if not individual.word_within_bounds(word):
-                        constraint_x = self.n - 1 - (word.length if word.direction == Direction.HORIZONTAL else 0)
-                        constraint_y = self.m - 1 - (word.length if word.direction == Direction.VERTICAL else 0)
-
-                        word.x = random.randint(0, constraint_x)
-                        word.y = random.randint(0, constraint_y)
+                        word.x = random.randint(0, individual.generate_safe_x_from_word(word))
+                        word.y = random.randint(0, individual.generate_safe_y_from_word(word))
 
         return individual
-
-
-
-
 
     def run(self, max_generation=20000):
 
