@@ -32,7 +32,7 @@ class Graph:
         self._matrix[v][u] = GraphCell.FILLED
 
     def is_connected(self) -> bool:
-        return all(self._dfs())
+        return self.number_of_disconnected_nodes() == 0
 
     def number_of_disconnected_nodes(self) -> int:
         return len(list(filter(lambda x: not x, self._dfs())))
@@ -102,7 +102,6 @@ class Crossword:
     def __copy__(self) -> Crossword:
         crossword = Crossword(self.strings, self.n, self.m)
         crossword.words = [copy(word) for word in self.words]
-        crossword.fitness = self.fitness
         return crossword
 
     @property
@@ -173,7 +172,123 @@ class Crossword:
         print("\n")
 
     def update_fitness(self):
-        pass
+        g = Graph(len(self.words))
+        fitness = 0
+
+        for i in range(len(self.words)):
+            if not self.word_within_bounds(self.words[i]):
+                fitness += 1000
+
+            for j in range(i + 1, len(self.words)):
+
+                if self.words[i].direction == Direction.VERTICAL and self.words[j].direction == Direction.VERTICAL:
+                    # if they are both vertical then check if they are overlapping
+                    # firstly check if they are in the +-1 x column
+                    if abs(self.words[i].x - self.words[j].x) <= 1:
+                        if self.words[i].y <= self.words[j].y <= self.words[i].y + len(
+                                self.words[i].value):
+                            fitness += 1
+                        elif self.words[j].y <= self.words[i].y <= self.words[j].y + len(
+                                self.words[j].value):
+                            fitness += 1
+
+
+
+
+                elif self.words[i].direction == Direction.HORIZONTAL and self.words[
+                    j].direction == Direction.HORIZONTAL:
+                    # if they are both horizontal then check if they are overlapping
+                    # firstly check if they are in the +-1 y column
+                    if abs(self.words[i].y - self.words[j].y) <= 1:
+                        if self.words[i].x <= self.words[j].x <= self.words[i].x + len(
+                                self.words[i].value):
+                            fitness += 1
+                        elif self.words[j].x <= self.words[i].x <= self.words[j].x + len(
+                                self.words[j].value):
+                            fitness += 1
+
+
+
+                elif self.words[i].direction == Direction.VERTICAL and self.words[j].direction == Direction.HORIZONTAL:
+                    if self.words[j].x <= self.words[i].x < self.words[j].x + len(
+                            self.words[j].value):
+                        if self.words[i].y <= self.words[j].y < self.words[i].y + len(
+                                self.words[i].value):
+                            g.add_edge(i, j)
+                            g.add_edge(j, i)
+
+                            # check if the words are intersecting in the same letter
+                            if self.words[i].value[self.words[j].y - self.words[i].y] != \
+                                    self.words[j].value[self.words[i].x - self.words[j].x]:
+                                fitness += 1
+
+                    ii, jj = i, j
+                    # top collision
+                    if self.words[jj].y == self.words[ii].y - 1:
+                        if self.words[jj].x <= self.words[ii].x < self.words[jj].x + len(
+                                self.words[jj].value):
+                            fitness += 1
+
+                    # bottom collision
+                    if self.words[jj].y == self.words[ii].y + len(self.words[ii].value):
+                        if self.words[jj].x <= self.words[ii].x < self.words[jj].x + len(
+                                self.words[jj].value):
+                            fitness += 1
+
+                    # left collision
+                    if self.words[jj].x + len(self.words[jj].value) - 1 == self.words[ii].x - 1:
+                        if self.words[ii].y <= self.words[jj].y <= self.words[ii].y + len(
+                                self.words[ii].value) - 1:
+                            fitness += 1
+
+                    # right collision
+                    if self.words[jj].x == self.words[ii].x + 1:
+                        if self.words[ii].y <= self.words[jj].y <= self.words[ii].y + len(
+                                self.words[ii].value) - 1:
+                            fitness += 1
+
+
+
+                elif self.words[i].direction == Direction.HORIZONTAL and self.words[j].direction == Direction.VERTICAL:
+                    if self.words[i].x <= self.words[j].x < self.words[i].x + len(
+                            self.words[i].value):
+                        if self.words[j].y <= self.words[i].y < self.words[j].y + len(
+                                self.words[j].value):
+                            g.add_edge(i, j)
+                            g.add_edge(j, i)
+                            # check if the words are intersecting in the same letter
+                            if self.words[j].value[self.words[i].y - self.words[j].y] != \
+                                    self.words[i].value[self.words[j].x - self.words[i].x]:
+                                fitness += 1
+
+                    jj, ii = i, j
+                    # top collision
+                    if self.words[jj].y == self.words[ii].y - 1:
+                        if self.words[jj].x <= self.words[ii].x < self.words[jj].x + len(
+                                self.words[jj].value):
+                            fitness += 1
+
+                    # bottom collision
+                    if self.words[jj].y == self.words[ii].y + len(self.words[ii].value):
+                        if self.words[jj].x <= self.words[ii].x < self.words[jj].x + len(
+                                self.words[jj].value):
+                            fitness += 1
+
+                    # left collision
+                    if self.words[jj].x + len(self.words[jj].value) - 1 == self.words[ii].x - 1:
+                        if self.words[ii].y <= self.words[jj].y <= self.words[ii].y + len(
+                                self.words[ii].value) - 1:
+                            fitness += 1
+
+                    # right collision
+                    if self.words[jj].x == self.words[ii].x + 1:
+                        if self.words[ii].y <= self.words[jj].y <= self.words[ii].y + len(
+                                self.words[ii].value) - 1:
+                            fitness += 1
+
+        fitness += g.number_of_disconnected_nodes() * 3
+
+        self.fitness = fitness
 
 
 class EvolutionaryAlgorithm:
@@ -221,7 +336,6 @@ class EvolutionaryAlgorithm:
 
         best_individuals = population[:int(len(population) * best_individuals_percentage)]
 
-        # select the rest of the individuals randomly
         rest_individuals_len = len(population) - int(len(population) * best_individuals_percentage)
         rest_individuals = random.sample(population[:], rest_individuals_len)
 
@@ -239,7 +353,7 @@ class EvolutionaryAlgorithm:
         return new_population
 
     def _tournament_selection(self, population: List[Crossword], tournament_size=3):
-        return max(random.sample(population, k=tournament_size), key=lambda x: x.fitness)
+        return min(random.sample(population, k=tournament_size), key=lambda x: x.fitness)
 
     def _crossover(self, parent1: Crossword, parent2: Crossword, crossover_rate: float = 0.5) -> Crossword:
         child = deepcopy(parent1)
@@ -280,10 +394,8 @@ class EvolutionaryAlgorithm:
         return population
 
     def run(self, max_generation=20000):
-        best_fitness = MAX_INT
-        stagnant_generations = 0
 
-        for i in range(max_generation):
+        for generation in range(max_generation):
             self.calculate_fitnesses()
 
             self.population.sort(key=lambda x: x.fitness)
@@ -292,16 +404,10 @@ class EvolutionaryAlgorithm:
             print(f"Best fitness: {current_best_fitness}")
 
             self.population[0].print()
-            print(f"Generation: {i}")
+            print(f"Generation: {generation}")
 
             if current_best_fitness == 0:
                 break
-
-            if current_best_fitness == best_fitness:
-                stagnant_generations += 1
-            else:
-                best_fitness = current_best_fitness
-                stagnant_generations = 0
 
             self.population = self._selection(self.population)
 
@@ -315,7 +421,7 @@ class EvolutionaryAlgorithm:
 
 
 def main():
-    crossword = EvolutionaryAlgorithm(["wonderful", "goal", "lame", "fullstack", "warioorgan", "nigger"])
+    crossword = EvolutionaryAlgorithm(["wonderful", "fullstack", "warioorgan"])
     crossword.run()
 
 
