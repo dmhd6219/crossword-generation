@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import sys
 from enum import Enum
 from copy import copy
@@ -94,7 +95,7 @@ class Crossword:
         self._strings = strings
 
         self.words = self._generate_random_positions()
-        self.update_fitness()
+        self.fitness = self.calculate_fitness()
 
     def __str__(self):
         return ";".join([str(x) for x in self.words])
@@ -172,7 +173,10 @@ class Crossword:
         print("\n")
 
     def detect_overlapping(self, word1: Word, word2: Word) -> bool:
-        if word1.direction == word2.direction == Direction.VERTICAL:
+        if word1.direction != word2.direction:
+            return False
+
+        if word1.direction == Direction.VERTICAL:
             if not (abs(word1.x - word2.x) <= 1):
                 return False
 
@@ -181,7 +185,7 @@ class Crossword:
 
             return word1.y <= word2.y <= word1.y + word1.length
 
-        elif word1.direction == word2.direction == Direction.HORIZONTAL:
+        elif word1.direction == Direction.HORIZONTAL:
             if not abs(word1.y - word2.y) <= 1:
                 return False
 
@@ -193,6 +197,9 @@ class Crossword:
         return False
 
     def check_intersection(self, word1: Word, word2: Word) -> bool:
+        if word1.direction == word2.direction:
+            return False
+
         if word1.direction == Direction.VERTICAL:
             return (word2.x <= word1.x < word2.x + len(word2.value) and
                     word1.y <= word2.y < word1.y + len(word1.value))
@@ -201,32 +208,40 @@ class Crossword:
                     word2.y <= word1.y < word2.y + len(word2.value))
 
     def check_letter_match(self, word1: Word, word2: Word) -> bool:
+        if word1.direction == word2.direction:
+            return False
+
         if word1.direction == Direction.VERTICAL:
             return word1.value[word2.y - word1.y] == word2.value[word1.x - word2.x]
         else:
             return word1.value[word2.x - word1.x] == word2.value[word1.y - word2.y]
 
     def check_collisions(self, word1: Word, word2: Word) -> int:
+        if word1.direction == word2.direction:
+            return 0
+
         collisions = 0
 
-        if word1.direction != word2.direction:
-            if word2.y == word1.y - 1 and word2.x <= word1.x < word2.x + len(word2.value):
+        if word1.direction == Direction.HORIZONTAL:
+            word1, word2 = word2, word1
+
+        if word2.y == word1.y - 1 and word2.x <= word1.x < word2.x + len(word2.value):
+            collisions += 1
+
+        if word2.y == word1.y + len(word1.value) and word2.x <= word1.x < word2.x + len(word2.value):
+            collisions += 1
+
+        if word2.x + len(word2.value) - 1 == word1.x - 1:
+            if word1.y <= word2.y <= word1.y + len(word1.value) - 1:
                 collisions += 1
 
-            if word2.y == word1.y + len(word1.value) and word2.x <= word1.x < word2.x + len(word2.value):
+        if word2.x == word1.x + 1:
+            if word1.y <= word2.y <= word1.y + len(word1.value) - 1:
                 collisions += 1
-
-            if word2.x + len(word2.value) - 1 == word1.x - 1:
-                if word1.y <= word2.y <= word1.y + len(word1.value) - 1:
-                    collisions += 1
-
-            if word2.x == word1.x + 1:
-                if word1.y <= word2.y <= word1.y + len(word1.value) - 1:
-                    collisions += 1
 
         return collisions
 
-    def update_fitness(self):
+    def calculate_fitness(self) -> int:
         graph = Graph(len(self.words))
         fitness = 0
 
@@ -249,8 +264,7 @@ class Crossword:
                     fitness += self.check_collisions(word1, word2)
 
         fitness += graph.get_amount_of_disconnected() * 100
-
-        self.fitness = fitness
+        return fitness
 
 
 class EvolutionaryAlgorithm:
@@ -268,7 +282,7 @@ class EvolutionaryAlgorithm:
         self._m = m
         self._population_size = population_size
 
-        self.population = self.generate_random_population(population_size)
+        self.population = []
 
     @property
     def strings(self) -> List[str]:
@@ -288,7 +302,7 @@ class EvolutionaryAlgorithm:
 
     def calculate_fitnesses(self) -> None:
         for crossword in self.population:
-            crossword.update_fitness()
+            crossword.fitness = crossword.calculate_fitness()
 
     def generate_random_population(self, population_size=300):
         return [Crossword(self.strings, self.m, self.n) for _ in range(population_size)]
@@ -350,36 +364,64 @@ class EvolutionaryAlgorithm:
 
         return individual
 
-    def run(self, max_generation=20000):
+    def run(self, max_generation=100000, current_generation: int = 0, current_try: int = 0, max_tries: int = 100):
+        idle_generations = 0
+        max_fitness = MAX_INT
+        self.population = self.generate_random_population(self.population_size)
 
-        for generation in range(max_generation):
+        for generation in range(current_generation, max_generation):
             self.calculate_fitnesses()
 
-            self.population.sort(key=lambda x: x.fitness)
+            self.population = sorted(self.population, key=lambda x: x.fitness)
 
             current_best_fitness = self.population[0].fitness
-            print(f"Best fitness: {current_best_fitness}")
-
-            self.population[0].print()
-            print(f"Generation: {generation}")
 
             if current_best_fitness == 0:
+                self.population[0].calculate_fitness()
+                print(f"Best fitness: {self.population[0].fitness}")
+                self.population[0].print()
+                return
+
+            print(f"Best fitness: {current_best_fitness}")
+
+            if current_best_fitness == max_fitness:
+                idle_generations += 1
+            elif current_best_fitness < max_fitness:
+                max_fitness = current_best_fitness
+                idle_generations = 0
+
+            self.population[0].print()
+            print(f"Generation: {generation} and {current_try}'th try")
+
+            if idle_generations >= 5:
+                self.population = self._mutate_population(self.population, 0.1)
+
+            if idle_generations >= 50:
+                self.run(
+                    max_generation=max_generation,
+                    current_generation=generation,
+                    current_try=current_try + 1,
+                    max_tries=max_tries
+                )
                 break
 
             self.population = self._selection(self.population)
 
         self.calculate_fitnesses()
 
-        self.population.sort(key=lambda x: x.fitness)
 
-        self.population[0].update_fitness()
-        print(f"Best fitness: {self.population[0].fitness}")
-        self.population[0].print()
+def read_input(inputs: str = "./inputs") -> List[List[str]]:
+    tests = []
+    for test in filter(lambda x: x.startswith("input") and x.endswith(".txt"), os.listdir(inputs)):
+        with open(f"{inputs}/{test}") as file:
+            tests.append([x.rstrip("\n") for x in file.readlines()])
 
+    return tests
 
 def main():
-    crossword = EvolutionaryAlgorithm(["wonderful", "fullstack", "warioorgan"])
-    crossword.run()
+    for test in read_input():
+        crossword = EvolutionaryAlgorithm(test)
+        crossword.run()
 
 
 if __name__ == "__main__":
