@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import sys
 from enum import Enum
-from copy import deepcopy, copy
+from copy import copy
 import random
-from typing import List
+from typing import List, Set
 
 MAX_INT = sys.maxsize
 
@@ -35,16 +35,16 @@ class Graph:
         return self.get_amount_of_disconnected() == 0
 
     def get_amount_of_disconnected(self) -> int:
-        return len(list(filter(lambda x: not x, self._dfs())))
+        return self._n - len(self._dfs())
 
-    def _dfs(self, i=0, visited=None) -> List[bool]:
+    def _dfs(self, current: int = 0, visited: Set[int] = None) -> Set[int]:
         if visited is None:
-            visited = [False for _ in range(self._n)]
+            visited = set()
 
-        visited[i] = True
-        for j in range(self._n):
-            if self._matrix[i][j] == GraphCell.FILLED and not visited[j]:
-                self._dfs(j, visited)
+        visited.add(current)
+        for new in range(self._n):
+            if self._matrix[current][new] == GraphCell.FILLED and new not in visited:
+                self._dfs(new, visited)
 
         return visited
 
