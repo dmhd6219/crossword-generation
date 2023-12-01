@@ -227,28 +227,28 @@ class Crossword:
         return collisions
 
     def update_fitness(self):
-        g = Graph(len(self.words))
+        graph = Graph(len(self.words))
         fitness = 0
 
         for i in range(len(self.words)):
             word1 = self.words[i]
 
-            fitness += 1000 * (not self.word_within_bounds(word1))
+            fitness += 10000 * (not self.word_within_bounds(word1))
 
             for j in range(i + 1, len(self.words)):
                 word2 = self.words[j]
 
                 if word1.direction == word2.direction:
-                    fitness += 5 * self.detect_overlapping(word1, word2)
+                    fitness += 10 * self.detect_overlapping(word1, word2)
                 else:
                     if self.check_intersection(word1, word2):
-                        g.fill_edge(i, j)
-                        g.fill_edge(j, i)
+                        graph.fill_edge(i, j)
+                        graph.fill_edge(j, i)
                         fitness += 3 * (not self.check_letter_match(word1, word2))
 
                     fitness += self.check_collisions(word1, word2)
 
-        fitness += g.get_amount_of_disconnected()
+        fitness += graph.get_amount_of_disconnected() * 100
 
         self.fitness = fitness
 
@@ -293,14 +293,14 @@ class EvolutionaryAlgorithm:
     def generate_random_population(self, population_size=300):
         return [Crossword(self.strings, self.m, self.n) for _ in range(population_size)]
 
-    def _selection(self, initial_population: List[Crossword], best_individuals_percentage=0.2):
+    def _selection(self, initial_population: List[Crossword], best_individuals_percentage=0.3):
         population = [copy(crossword) for crossword in initial_population]
 
         best_individuals_length = int(len(population) * best_individuals_percentage)
         rest_individuals_length = len(population) - best_individuals_length
 
-        best_individuals = population[:best_individuals_length]
-        rest_individuals = random.sample(population[:], rest_individuals_length)
+        best_individuals = population[:best_individuals_length:]
+        rest_individuals = random.sample(population, rest_individuals_length)
 
         new_individuals = [
             self._crossover(
