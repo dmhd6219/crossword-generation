@@ -5,7 +5,7 @@ import sys
 from enum import Enum
 from copy import copy
 import random
-from typing import List, Set
+from typing import List, Set, Tuple
 
 MAX_INT = sys.maxsize
 
@@ -266,6 +266,9 @@ class Crossword:
         fitness += graph.get_amount_of_disconnected() * 100
         return fitness
 
+    def generate_output(self) -> str:
+        return "\n".join(f"{word.x} {word.y} {word.direction.value}" for word in self.words)
+
 
 class EvolutionaryAlgorithm:
     _strings: List[str]
@@ -364,7 +367,8 @@ class EvolutionaryAlgorithm:
 
         return individual
 
-    def run(self, max_generation=100000, current_generation: int = 0, current_try: int = 0, max_tries: int = 100):
+    def run(self, max_generation=100000, current_generation: int = 0, current_try: int = 0,
+            max_tries: int = 100) -> Crossword:
         idle_generations = 0
         max_fitness = MAX_INT
         self.population = self.generate_random_population(self.population_size)
@@ -378,11 +382,11 @@ class EvolutionaryAlgorithm:
 
             if current_best_fitness == 0:
                 self.population[0].calculate_fitness()
-                print(f"Best fitness: {self.population[0].fitness}")
+                # print(f"Best fitness: {self.population[0].fitness}")
                 self.population[0].print()
-                return
+                return self.population[0]
 
-            print(f"Best fitness: {current_best_fitness}")
+            # print(f"Best fitness: {current_best_fitness}")
 
             if current_best_fitness == max_fitness:
                 idle_generations += 1
@@ -391,7 +395,7 @@ class EvolutionaryAlgorithm:
                 idle_generations = 0
 
             self.population[0].print()
-            print(f"Generation: {generation} and {current_try}'th try")
+            # print(f"Generation: {generation} and {current_try}'th try")
 
             if idle_generations >= 5:
                 self.population = self._mutate_population(self.population, 0.1)
@@ -407,21 +411,52 @@ class EvolutionaryAlgorithm:
 
             self.population = self._selection(self.population)
 
-        self.calculate_fitnesses()
+        return self.population[0]
 
 
-def read_input(inputs: str = "./inputs") -> List[List[str]]:
-    tests = []
-    for test in filter(lambda x: x.startswith("input") and x.endswith(".txt"), os.listdir(inputs)):
-        with open(f"{inputs}/{test}") as file:
-            tests.append([x.rstrip("\n") for x in file.readlines()])
+class Assignment:
+    _base_folder: str
 
-    return tests
+    def __init__(self, base_folder: str = "."):
+        self._base_folder = base_folder
+
+    @property
+    def base_folder(self) -> str:
+        return self._base_folder
+
+    @property
+    def inputs_folder(self) -> str:
+        return f"{self.base_folder}/inputs"
+
+    @property
+    def outputs_folder(self) -> str:
+        return f"{self.base_folder}/outputs"
+
+    def read_input(self) -> List[Tuple[str, List[str]]]:
+        tests = []
+        for test in filter(lambda x: x.startswith("input") and x.endswith(".txt"), os.listdir(self.inputs_folder)):
+            with open(f"{self.inputs_folder}/{test}") as file:
+                tests.append((test, [x.rstrip("\n") for x in file.readlines()]))
+
+        return tests
+
+    def solve(self):
+        for test in self.read_input():
+            name = test[0]
+            dataset = test[1]
+            print(f"Checking {name}")
+
+            crossword = EvolutionaryAlgorithm(dataset)
+            answer = crossword.run()
+
+            with open(f"{self.outputs_folder}/{name}") as file:
+                file.write(answer.generate_output())
+
 
 def main():
-    for test in read_input():
-        crossword = EvolutionaryAlgorithm(test)
-        crossword.run()
+    assignment = Assignment()
+
+    assignment.solve()
 
 
 if __name__ == "__main__":
