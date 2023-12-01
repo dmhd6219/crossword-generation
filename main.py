@@ -310,7 +310,7 @@ class EvolutionaryAlgorithm:
         ]
 
         # perform mutation on the new individuals
-        new_individuals = self._mutation(new_individuals)
+        new_individuals = self._mutate_population(new_individuals)
         new_population = best_individuals + new_individuals
         return new_population
 
@@ -328,32 +328,43 @@ class EvolutionaryAlgorithm:
 
         return child
 
-    def _mutation(self, initial_population: List[Crossword], mutation_rate: float = 0.01):
+    def _mutate_population(self, initial_population: List[Crossword], mutation_rate: float = 0.01):
         population = [copy(crossword) for crossword in initial_population]
 
-        for crossword in population:
-            for word in crossword.words:
-                if random.random() < mutation_rate:
-                    mutation_probability = random.random()
-
-                    if mutation_probability < 0.3:
-                        constraint_x = self.n - 1 - (word.length if word.direction == Direction.HORIZONTAL else 0)
-                        word.x = random.randint(0, constraint_x)
-
-                    elif mutation_probability < 0.6:
-                        constraint_y = self.m - 1 - (word.length if word.direction == Direction.VERTICAL else 0)
-                        word.y = random.randint(0, constraint_y)
-
-                    else:
-                        word.direction = random.choice(list(Direction))
-                        if not crossword.word_within_bounds(word):
-                            constraint_x = self.n - 1 - (word.length if word.direction == Direction.HORIZONTAL else 0)
-                            constraint_y = self.m - 1 - (word.length if word.direction == Direction.VERTICAL else 0)
-
-                            word.x = random.randint(0, constraint_x)
-                            word.y = random.randint(0, constraint_y)
+        for i in range(len(population)):
+            population[i] = self._mutate(population[i], mutation_rate)
 
         return population
+
+    def _mutate(self, initial_individual: Crossword, mutation_rate: float = 0.01) -> Crossword:
+        individual = copy(initial_individual)
+
+        for word in individual.words:
+            if random.random() < mutation_rate:
+                mutation_probability = random.random()
+
+                if mutation_probability < 0.3:
+                    constraint_x = self.n - 1 - (word.length if word.direction == Direction.HORIZONTAL else 0)
+                    word.x = random.randint(0, constraint_x)
+
+                elif mutation_probability < 0.6:
+                    constraint_y = self.m - 1 - (word.length if word.direction == Direction.VERTICAL else 0)
+                    word.y = random.randint(0, constraint_y)
+
+                else:
+                    word.direction = random.choice(list(Direction))
+                    if not individual.word_within_bounds(word):
+                        constraint_x = self.n - 1 - (word.length if word.direction == Direction.HORIZONTAL else 0)
+                        constraint_y = self.m - 1 - (word.length if word.direction == Direction.VERTICAL else 0)
+
+                        word.x = random.randint(0, constraint_x)
+                        word.y = random.randint(0, constraint_y)
+
+        return individual
+
+
+
+
 
     def run(self, max_generation=20000):
 
