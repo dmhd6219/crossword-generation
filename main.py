@@ -27,14 +27,14 @@ class Graph:
         self._n = n
         self._matrix = [[GraphCell.EMPTY for _ in range(n)] for _ in range(n)]
 
-    def add_edge(self, u: int, v: int) -> None:
+    def fill_edge(self, u: int, v: int) -> None:
         self._matrix[u][v] = GraphCell.FILLED
         self._matrix[v][u] = GraphCell.FILLED
 
     def is_connected(self) -> bool:
-        return self.number_of_disconnected_nodes() == 0
+        return self.get_amount_of_disconnected() == 0
 
-    def number_of_disconnected_nodes(self) -> int:
+    def get_amount_of_disconnected(self) -> int:
         return len(list(filter(lambda x: not x, self._dfs())))
 
     def _dfs(self, i=0, visited=None) -> List[bool]:
@@ -171,122 +171,84 @@ class Crossword:
         print(" " + " - " * self.m + " ")
         print("\n")
 
+    def detect_overlapping(self, word1: Word, word2: Word) -> bool:
+        if word1.direction == word2.direction == Direction.VERTICAL:
+            if not (abs(word1.x - word2.x) <= 1):
+                return False
+
+            if word2.y < word1.y:
+                word1, word2 = word2, word1
+
+            return word1.y <= word2.y <= word1.y + word1.length
+
+        elif word1.direction == word2.direction == Direction.HORIZONTAL:
+            if not abs(word1.y - word2.y) <= 1:
+                return False
+
+            if word2.x < word1.x:
+                word1, word2 = word2, word1
+
+            return word1.x <= word2.x <= word1.x + word1.length
+
+        return False
+
+    def check_intersection(self, word1: Word, word2: Word) -> bool:
+        if word1.direction == Direction.VERTICAL:
+            return (word2.x <= word1.x < word2.x + len(word2.value) and
+                    word1.y <= word2.y < word1.y + len(word1.value))
+        else:
+            return (word1.x <= word2.x < word1.x + len(word1.value) and
+                    word2.y <= word1.y < word2.y + len(word2.value))
+
+    def check_letter_match(self, word1: Word, word2:Word) -> bool:
+        if word1.direction == Direction.VERTICAL:
+            return word1.value[word2.y - word1.y] == word2.value[word1.x - word2.x]
+        else:
+            return word1.value[word2.x - word1.x] == word2.value[word1.y - word2.y]
+
+    def check_collisions(self, word1: Word, word2: Word) -> int:
+        collisions = 0
+
+        if word1.direction != word2.direction:
+            if word2.y == word1.y - 1 and word2.x <= word1.x < word2.x + len(word2.value):
+                collisions += 1
+
+            if word2.y == word1.y + len(word1.value) and word2.x <= word1.x < word2.x + len(word2.value):
+                collisions += 1
+
+            if word2.x + len(word2.value) - 1 == word1.x - 1:
+                if word1.y <= word2.y <= word1.y + len(word1.value) - 1:
+                    collisions += 1
+
+            if word2.x == word1.x + 1:
+                if word1.y <= word2.y <= word1.y + len(word1.value) - 1:
+                    collisions += 1
+
+        return collisions
+
     def update_fitness(self):
         g = Graph(len(self.words))
         fitness = 0
 
         for i in range(len(self.words)):
-            if not self.word_within_bounds(self.words[i]):
-                fitness += 1000
+            word1 = self.words[i]
+
+            fitness += 1000 * (not self.word_within_bounds(word1))
 
             for j in range(i + 1, len(self.words)):
+                word2 = self.words[j]
 
-                if self.words[i].direction == Direction.VERTICAL and self.words[j].direction == Direction.VERTICAL:
-                    # if they are both vertical then check if they are overlapping
-                    # firstly check if they are in the +-1 x column
-                    if abs(self.words[i].x - self.words[j].x) <= 1:
-                        if self.words[i].y <= self.words[j].y <= self.words[i].y + len(
-                                self.words[i].value):
-                            fitness += 1
-                        elif self.words[j].y <= self.words[i].y <= self.words[j].y + len(
-                                self.words[j].value):
-                            fitness += 1
+                if word1.direction == word2.direction:
+                    fitness += 5 * self.detect_overlapping(word1, word2)
+                else:
+                    if self.check_intersection(word1, word2):
+                        g.fill_edge(i, j)
+                        g.fill_edge(j, i)
+                        fitness += 3 * (not self.check_letter_match(word1, word2))
 
+                    fitness += self.check_collisions(word1, word2)
 
-
-
-                elif self.words[i].direction == Direction.HORIZONTAL and self.words[
-                    j].direction == Direction.HORIZONTAL:
-                    # if they are both horizontal then check if they are overlapping
-                    # firstly check if they are in the +-1 y column
-                    if abs(self.words[i].y - self.words[j].y) <= 1:
-                        if self.words[i].x <= self.words[j].x <= self.words[i].x + len(
-                                self.words[i].value):
-                            fitness += 1
-                        elif self.words[j].x <= self.words[i].x <= self.words[j].x + len(
-                                self.words[j].value):
-                            fitness += 1
-
-
-
-                elif self.words[i].direction == Direction.VERTICAL and self.words[j].direction == Direction.HORIZONTAL:
-                    if self.words[j].x <= self.words[i].x < self.words[j].x + len(
-                            self.words[j].value):
-                        if self.words[i].y <= self.words[j].y < self.words[i].y + len(
-                                self.words[i].value):
-                            g.add_edge(i, j)
-                            g.add_edge(j, i)
-
-                            # check if the words are intersecting in the same letter
-                            if self.words[i].value[self.words[j].y - self.words[i].y] != \
-                                    self.words[j].value[self.words[i].x - self.words[j].x]:
-                                fitness += 1
-
-                    ii, jj = i, j
-                    # top collision
-                    if self.words[jj].y == self.words[ii].y - 1:
-                        if self.words[jj].x <= self.words[ii].x < self.words[jj].x + len(
-                                self.words[jj].value):
-                            fitness += 1
-
-                    # bottom collision
-                    if self.words[jj].y == self.words[ii].y + len(self.words[ii].value):
-                        if self.words[jj].x <= self.words[ii].x < self.words[jj].x + len(
-                                self.words[jj].value):
-                            fitness += 1
-
-                    # left collision
-                    if self.words[jj].x + len(self.words[jj].value) - 1 == self.words[ii].x - 1:
-                        if self.words[ii].y <= self.words[jj].y <= self.words[ii].y + len(
-                                self.words[ii].value) - 1:
-                            fitness += 1
-
-                    # right collision
-                    if self.words[jj].x == self.words[ii].x + 1:
-                        if self.words[ii].y <= self.words[jj].y <= self.words[ii].y + len(
-                                self.words[ii].value) - 1:
-                            fitness += 1
-
-
-
-                elif self.words[i].direction == Direction.HORIZONTAL and self.words[j].direction == Direction.VERTICAL:
-                    if self.words[i].x <= self.words[j].x < self.words[i].x + len(
-                            self.words[i].value):
-                        if self.words[j].y <= self.words[i].y < self.words[j].y + len(
-                                self.words[j].value):
-                            g.add_edge(i, j)
-                            g.add_edge(j, i)
-                            # check if the words are intersecting in the same letter
-                            if self.words[j].value[self.words[i].y - self.words[j].y] != \
-                                    self.words[i].value[self.words[j].x - self.words[i].x]:
-                                fitness += 1
-
-                    jj, ii = i, j
-                    # top collision
-                    if self.words[jj].y == self.words[ii].y - 1:
-                        if self.words[jj].x <= self.words[ii].x < self.words[jj].x + len(
-                                self.words[jj].value):
-                            fitness += 1
-
-                    # bottom collision
-                    if self.words[jj].y == self.words[ii].y + len(self.words[ii].value):
-                        if self.words[jj].x <= self.words[ii].x < self.words[jj].x + len(
-                                self.words[jj].value):
-                            fitness += 1
-
-                    # left collision
-                    if self.words[jj].x + len(self.words[jj].value) - 1 == self.words[ii].x - 1:
-                        if self.words[ii].y <= self.words[jj].y <= self.words[ii].y + len(
-                                self.words[ii].value) - 1:
-                            fitness += 1
-
-                    # right collision
-                    if self.words[jj].x == self.words[ii].x + 1:
-                        if self.words[ii].y <= self.words[jj].y <= self.words[ii].y + len(
-                                self.words[ii].value) - 1:
-                            fitness += 1
-
-        fitness += g.number_of_disconnected_nodes() * 3
+        fitness += g.get_amount_of_disconnected()
 
         self.fitness = fitness
 
@@ -348,7 +310,7 @@ class EvolutionaryAlgorithm:
         ]
 
         # perform mutation on the new individuals
-        new_individuals = self._mutation(new_individuals, 0.03)
+        new_individuals = self._mutation(new_individuals)
         new_population = best_individuals + new_individuals
         return new_population
 
