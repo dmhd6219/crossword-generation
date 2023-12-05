@@ -325,6 +325,15 @@ class EvolutionaryAlgorithm:
     def generate_random_population(self):
         return [Crossword(self.strings, self.m, self.n) for _ in range(self.population_size)]
 
+    def _select_individual(self, population: List[Crossword], length: int) -> List[Crossword]:
+        fitness_values = [x.fitness for x in population]
+
+        return random.choices(
+            population=population,
+            weights=fitness_values,
+            k=length
+        )[0]
+
     def _selection(self, initial_population: List[Crossword], best_individuals_percentage=0.1):
         population = [copy(crossword) for crossword in initial_population]
 
@@ -350,15 +359,20 @@ class EvolutionaryAlgorithm:
 
     @staticmethod
     def _crossover(parent1: Crossword, parent2: Crossword, crossover_rate: float = 0.5) -> Crossword:
-        child = copy(parent1)
+        child1 = copy(parent1)
+        child2 = copy(parent2)
 
         for i in range(len(parent1.words)):
             if random.random() < crossover_rate:
-                child.words[i].x = parent2.words[i].x
-                child.words[i].y = parent2.words[i].y
-                child.words[i].direction = parent2.words[i].direction
+                child1.words[i].x = parent2.words[i].x
+                child1.words[i].y = parent2.words[i].y
+                child1.words[i].direction = parent2.words[i].direction
 
-        return child
+                child2.words[i].x = parent1.words[i].x
+                child2.words[i].y = parent1.words[i].y
+                child2.words[i].direction = parent1.words[i].direction
+
+        return random.choice([child1, child2])
 
     def _mutate_population(self, initial_population: List[Crossword], mutation_rate: float = 0.01):
         return [self._mutate(x, mutation_rate) for x in [copy(crossword) for crossword in initial_population]]
@@ -437,14 +451,14 @@ class EvolutionaryAlgorithm:
             self.population[0].print()
             print(f"Generation: {generation} and {current_try}'th try")
 
-            if idle_generations >= len(self.strings) ** 3:
-                self.run(
-                    max_generation=max_generation,
-                    current_generation=generation,
-                    current_try=current_try + 1,
-                    max_tries=max_tries
-                )
-                break
+            # if idle_generations >= len(self.strings) ** 3:
+            #     self.run(
+            #         max_generation=max_generation,
+            #         current_generation=generation,
+            #         current_try=current_try + 1,
+            #         max_tries=max_tries
+            #     )
+            #     break
 
             self.population = self._selection(self.population)
 
