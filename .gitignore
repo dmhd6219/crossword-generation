@@ -160,3 +160,5 @@ cython_debug/
 #.idea/
 /test.py
 /word_generator.py
+/report/report.synctex.gz
+/report/report.aux
