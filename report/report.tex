@@ -5,22 +5,195 @@
 \author{Sviatoslav Sviatkin, CS-05}
 \date{December 2023}
 
+\usepackage[final]{hyperref} % adds hyper links inside the generated pdf file
+\hypersetup{
+  colorlinks=true,       % false: boxed links; true: colored links
+  %linkcolor=blue,        % color of internal links
+  citecolor=blue,        % color of links to bibliography
+  %filecolor=magenta,     % color of file links
+  urlcolor=blue         
+}
+
 \begin{document}
 
 \maketitle
 
+\section*{Hello, world!}
+I've been saving all my changes to a \href{https://github.com/dmhd6219/crossword-generation}{repository on github}. If you want, you can write to \href{https://t.me/slavasvyatkin}{me} and I will give you access, because at the moment the repository is private.
+
 \section*{Deep description of EA algorithm}
 
-\subsection*{Flow}
+\subsection*{Algorithm descripton}
+
+\begin{enumerate}
+	\item The Assignment class is used to setup input/output folders and read test case input files.
+	\item For each test case, an EvolutionaryAlgorithm instance is created with the list of words to place.
+	\item The run() method starts the evolutionary algorithm process:
+		\begin{itemize}
+				\item An initial random population of Crossword solutions is generated
+				\item An initial random population of Crossword solutions is generated
+				\item Solutions are sorted by fitness
+				\item Selection, crossover, and mutation operators are applied to create new populations
+				\item This evolves the populations over generations to find better solutions
+		\end{itemize}
+	\item Once a good enough solution is found or max generations is reached, the best solution is saved and output is written.
+
+\end{enumerate}
+
+\subsection*{Key aspects}
+	
+\begin{itemize}
+			\item Crossword and Word classes represent the problem state
+			\item An initial random population of Crossword solutions is generated
+			\item Evolutionary operators like selection, crossover, mutation used to evolve populations
+			\item Selection, crossover, and mutation operators are applied to create new populations
+			\item This evolves the populations over generations to find better solutions
+\end{itemize}
+
+
+\subsection*{Selection}
+
+\begin{enumerate}
+		\item The population is separated into two groups:
+			\begin{itemize}
+					\item best individuals (top 10\% based on fitness)
+					\item rest of the individuals
+			\end{itemize}
+		\item The best individuals are directly copied over to the next generation. This elitism ensures the best solutions are preserved.
+		\item For the rest group, tournament selection is used to select parents for crossover.
+			\begin{itemize}
+					\item Tournament selection randomly samples a few individuals and picks the best fitness.
+					\item This pressure biases selection towards fitter individuals.
+			\end{itemize}
+		\item Crossover between selected parents produces new child solutions
+			\begin{itemize}
+					\item Uniform crossover is used - words swap positions randomly between parents.
+			\end{itemize}
+		\item The child solutions are mutated to introduce variation
+			\begin{itemize}
+					\item Different mutation operators modify word placement with certain probabilities.
+			\end{itemize}
+		\item The best individuals and new mutated children form the population for next generation.
+\end{enumerate}
+
+\subsection*{Crossover}
+\begin{enumerate}
+		\item Two parent solutions are selected using tournament selection.
+		\item A uniform crossover approach is used rather than single/multi-point.
+		\item A random crossover rate between 0 and 1 is chosen (default 0.5).
+		\item For each word/gene position in the parents' genomes:
+			\begin{itemize}
+					\item A random number is generated between 0 and 1.
+					\item If less than the crossover rate:
+					\begin{itemize}
+							\item The word coordinates/direction are swapped between parents.
+					\end{itemize}
+					\item Otherwise they are retained.
+			\end{itemize}
+		\item This results in two child solutions with words swapped at various random positions.+
+		\item The probabilities of applying these mutations is evenly weighted.
+
+\end{enumerate}
+
+\subsection*{Mutation}
+
+\begin{enumerate}
+		\item After crossover, all the child solutions undergo mutation based on a mutation rate (default 0.5).
+		\item For each Word in a solution, a random number is checked against the mutation rate.
+		\item If under the mutation rate, one of several mutation operators is applied:
+			\begin{enumerate}
+					\item Change X coordinate
+					\item Change Y coordinate
+					\item Change both coordinates
+					\item Change direction
+					\item Change direction and X coordinate
+					\item Change direction and Y coordinate
+					\item Change direction and both coordinates
+			\end{enumerate}
+		\item The probabilities of applying these mutations is evenly weighted.
+
+\end{enumerate}
+	The mutations introduce variability in the solutions. By randomly tweaking the placement of words, it allows the evolutionary algorithm to explore more of the search space and prevent pre-mature convergence on local optima.
+
+The right level of mutation is crucial - too high can result in too much randomness, while too low reduces exploration. A balance is needed to ensure continued evolutionary improvements.
 
 \subsection*{Fitness Function}
+The fitness function evaluates how good a candidate solution (crossword layout) is. Lower fitness is better. It works by penalizing violations of the crossword constraints:
+
+\begin{enumerate}
+		\item Check if words go out of bounds:
+				\begin{itemize}
+						\item Penalize by 100,000 per word if true
+				\end{itemize}
+		\item Check words for overlap:
+				\begin{itemize}
+						\item Penalize by 100 per overlap
+				\end{itemize}
+		\item Check intersections:
+				\begin{itemize}
+						\item Build a graph connecting intersecting words
+						\item Build a graph connecting intersecting words
+				\end{itemize}
+		\item Check collisions (words sharing edges):
+				\begin{itemize}
+						\item Penalize by 20 per collision.
+				\end{itemize}
+		\item Check connectivity in intersection graph:
+				\begin{itemize}
+						\item Penalize by 1,000 per disconnected subgraph (set of words not connected to others via intersections)
+				\end{itemize}
+\end{enumerate}
+
+By combining various spatial constraints (bounds, overlaps, collisions) and factual constraints (letter matches), the fitness function encourages evolutions of boards with:
+\begin{itemize}
+		\item Words fitting on board
+		\item No collisions
+		\item Intersecting words having valid connections
+		\item All words connected in single graph
+\end{itemize}
+
+Solutions that satisfy these conditions will have fitness scores equal to 0. The goal is to minimize this value over generations by evolving populations via selection, crossover and mutation operators.
 
 \subsection*{Specifics of variations}
 
 \subsection*{EA parameters}
+Population Size:
+\begin{itemize}
+		\item \_population\_size - Size of the population in each generation (default 100)
+\end{itemize}
+
+Selection:
+\begin{itemize}
+		\item \_select\_best - Takes top 10\% fittest individuals
+		\item \_roulette\_selection - Fitness proportional selection
+		\item \_tournament\_selection - Tournament size 3
+\end{itemize}
+
+Crossover:
+\begin{itemize}
+		\item \_mutation\_rate - Probability of mutation in child solutions (default 0.5)
+\end{itemize}
+
+General EA Control:
+\begin{itemize}
+		\item max\_generation - Maximum number of generations (stop criteria) (default 100000)
+		\item max\_tries - Maximum times to rerun EA from scratch (default 100)
+		\item idle\_generations - Generations without improvement before restart (length of words in crossword * 1000)
+\end{itemize}
+
+Fitness Weights:
+\begin{itemize}
+		\item Out of bounds word - 100,000 penalty
+		\item Overlapping words - 100 penalty
+		\item Letter mismatch - 5 penalty
+		\item Collision - 20 penalty
+		\item Disconnected graph - 1,000 penalty
+\end{itemize}
 
 \section*{Statistics}
 
-\subsection*{Fitness}
+\subsection*{Generations}
+
+\subsection*{Time}
 
 \end{document}
