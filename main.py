@@ -837,7 +837,7 @@ class EvolutionaryAlgorithm:
             print("Best:")
             self.population[0].print()
 
-        return (time.time() - start_time) / 60, current_generation, self.population[0]
+        return (time.time() - start_time) / 60, generation, self.population[0]
 
 
 class Assignment:
