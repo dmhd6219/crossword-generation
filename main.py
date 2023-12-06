@@ -513,6 +513,10 @@ class EvolutionaryAlgorithm:
         _n (int): Size n
         _m (int): Size m
         population (List[Crossword]): Population of solutions
+
+        _execution_time (float): Execution time of the best solution
+        _generation (int): Generation of the best solution
+        _best_individual (Crossword): Best solution
     """
 
     _strings: List[str]
@@ -522,6 +526,10 @@ class EvolutionaryAlgorithm:
     _population_size: int
 
     population: List[Crossword]
+
+    _execution_time: float
+    _generation: int
+    _best_individual: Crossword
 
     def __init__(self, strings: List[str], n: int = 20, m: int = 20, population_size: int = 100) -> None:
         """
@@ -539,6 +547,10 @@ class EvolutionaryAlgorithm:
         self._population_size = population_size
 
         self.population = []
+
+        self._execution_time = None
+        self._generation = None
+        self._best_individual = None
 
     @property
     def strings(self) -> List[str]:
@@ -808,6 +820,10 @@ class EvolutionaryAlgorithm:
             self.population = sorted(self.population, key=lambda x: x.fitness)
 
             if self.population[0].fitness == 0:
+                self._execution_time = (time.time() - start_time) / 60
+                self._generation = generation
+                self._best_individual = self.population[0]
+
                 break
 
             if self.population[0].fitness == max_fitness:
@@ -837,7 +853,7 @@ class EvolutionaryAlgorithm:
             print("Best:")
             self.population[0].print()
 
-        return (time.time() - start_time) / 60, generation, self.population[0]
+        return self._execution_time, self._generation, self._best_individual
 
 
 class Assignment:
