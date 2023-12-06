@@ -523,7 +523,7 @@ class EvolutionaryAlgorithm:
 
     population: List[Crossword]
 
-    def __init__(self, strings: List[str], n: int = 20, m: int = 20, population_size: int = 500) -> None:
+    def __init__(self, strings: List[str], n: int = 20, m: int = 20, population_size: int = 100) -> None:
         """
         Constructs EA instance with parameters.
 
@@ -780,7 +780,7 @@ class EvolutionaryAlgorithm:
         return individual
 
     def run(self, name: str, max_generation=100000, current_generation: int = 0, current_try: int = 0,
-            max_tries: int = 100) -> Crossword:
+            max_tries: int = 100) -> Tuple[float, int, Crossword]:
         """Runs evolutionary algorithm to solve crossword.
 
         Args:
@@ -799,7 +799,10 @@ class EvolutionaryAlgorithm:
 
         self.population = self.generate_random_population()
 
+        start_time = time.time()
+
         for generation in range(current_generation, max_generation):
+
             self.calculate_fitnesses()
 
             self.population = sorted(self.population, key=lambda x: x.fitness)
@@ -818,8 +821,8 @@ class EvolutionaryAlgorithm:
             print(f"Best fitness: {self.population[0].fitness}")
             self.population[0].print()
 
-            if idle_generations >= len(self.strings) ** 4:
-                self.run(
+            if idle_generations >= 1000 * len(self.strings):
+                return self.run(
                     name=name,
                     max_generation=max_generation,
                     current_generation=0,
@@ -834,7 +837,7 @@ class EvolutionaryAlgorithm:
             print("Best:")
             self.population[0].print()
 
-        return self.population[0]
+        return (time.time() - start_time) / 60, current_generation, self.population[0]
 
 
 class Assignment:
@@ -889,7 +892,7 @@ class Assignment:
         """
         return f"{self.base_directory}/images"
 
-    def read_input(self) -> List[Tuple[str, List[str]]]:
+    def read_input(self) -> List[Tuple[str, int, List[str]]]:
         """
         Read input test cases from input files.
 
@@ -899,7 +902,8 @@ class Assignment:
         tests = []
         for test in filter(lambda x: x.startswith("input") and x.endswith(".txt"), os.listdir(self.inputs_folder)):
             with open(f"{self.inputs_folder}/{test}") as file:
-                tests.append((test, [x.rstrip("\n") for x in file.readlines()]))
+                data = file.readlines()
+                tests.append((test, len(data), [x.rstrip("\n") for x in data]))
 
         return tests
 
@@ -907,17 +911,22 @@ class Assignment:
         """Solve the crossword assignment problem for all input test cases."""
         for test in self.read_input():
             name = test[0]
-            dataset = test[1]
-            logging.info(f"Checking {name}")
-            start_time = time.time()
+            length = test[1]
+            dataset = test[2]
+
+            logging.info(f"{time.time()}: Started checking {name}")
 
             crossword = EvolutionaryAlgorithm(dataset)
-            answer = crossword.run(name)
 
-            logging.info(f"Ended checking {name}, time = {(time.time() - start_time) / 60}")
+            execution_time, generation, answer = crossword.run(name)
+
+            logging.info(f"{time.time()}: Ended checking {name}")
 
             with open(f"{self.outputs_folder}/output{name[5::]}", mode="w") as file:
                 file.write(answer.generate_output())
+
+            with open(f"{self.base_directory}/statistics.csv", mode="a") as file:
+                file.write(f"{length};{execution_time};{generation}\n")
 
 
 def main() -> None:
