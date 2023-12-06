@@ -505,7 +505,8 @@ class Crossword:
 
 
 class EvolutionaryAlgorithm:
-    """Class implementing evolutionary algorithm for crossword solving.
+    """
+    Class implementing evolutionary algorithm for crossword solving.
 
     Attributes:
         _strings (List[str]): Words to place
@@ -522,8 +523,9 @@ class EvolutionaryAlgorithm:
 
     population: List[Crossword]
 
-    def __init__(self, strings: List[str], n: int = 20, m: int = 20, population_size: int = 100) -> None:
-        """Constructs EA instance with parameters.
+    def __init__(self, strings: List[str], n: int = 20, m: int = 20, population_size: int = 500) -> None:
+        """
+        Constructs EA instance with parameters.
 
         Args:
             strings (List[str]): Words to place
@@ -579,12 +581,14 @@ class EvolutionaryAlgorithm:
         return self._m
 
     def calculate_fitnesses(self) -> None:
-        """Calculate the fitness for each crossword in the population."""
+        """
+        Calculate the fitness for each crossword in the population."""
         for crossword in self.population:
             crossword.fitness = crossword.calculate_fitness()
 
     def generate_random_population(self) -> List[Crossword]:
-        """Generate a random population of crosswords.
+        """
+        Generate a random population of crosswords.
 
         Returns:
             List[Crossword]: The generated population.
